@@ -1,6 +1,6 @@
 {
-  "SpeechSubscriptionKey": "89t7s45tyu2i7y9j908w345u57962eb2",
-  "AzureRegion": "westus",
+  "SpeechSubscriptionKey": "ccbc14f1bb2a476187a831c1dcc6a3fc",
+  "AzureRegion": "westus2",
   "CustomSpeechId": "",
   "CustomVoiceIds": "",
   "CustomCommandsAppId": "",

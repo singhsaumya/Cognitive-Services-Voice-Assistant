@@ -93,6 +93,7 @@ namespace UWPVoiceAssistantSample
                 this.outputEndedEvent.Reset();
                 this.frameInputNode?.Start();
                 this.IsPlaying = true;
+                this.log.Log("Start playing audio");
             }
 
             await Task.Run(() => this.outputEndedEvent.WaitOne());

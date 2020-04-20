@@ -28,6 +28,16 @@ namespace UWPVoiceAssistantSample
         private DialogServiceConnector connector;
         private PushAudioInputStream connectorInputStream;
         private bool alreadyDisposed = false;
+        private ILogProvider logger;
+        private bool started = false;
+
+        /// <summary>
+        /// Initializes a new instance of the <see cref="DirectLineSpeechDialogBackend"/> class.
+        /// </summary>
+        public DirectLineSpeechDialogBackend()
+        {
+            this.logger = LogRouter.GetClassLogger();
+        }
 
         /// <summary>
         /// Raised when audio has begun flowing to Direct Line Speech and returns the interaction
@@ -112,7 +122,7 @@ namespace UWPVoiceAssistantSample
             this.connector.SessionStopped += (s, e) => this.SessionStopped?.Invoke(e.SessionId);
             this.connector.Recognizing += (s, e) =>
             {
-                Debug.WriteLine($"Connector recognizing: {e.Result.Text}");
+                this.logger.Log($"Connector recognizing: {e.Result.Text}");
                 switch (e.Result.Reason)
                 {
                     case ResultReason.RecognizingKeyword:
@@ -127,7 +137,7 @@ namespace UWPVoiceAssistantSample
             };
             this.connector.Recognized += (s, e) =>
             {
-                Debug.WriteLine($"Connector recognized: {e.Result.Text}");
+                this.logger.Log($"Connector recognized: {e.Result.Text}");
                 switch (e.Result.Reason)
                 {
                     case ResultReason.RecognizedKeyword:
@@ -162,7 +172,7 @@ namespace UWPVoiceAssistantSample
                     messageMedia: e.HasAudio ? new DirectLineSpeechAudioOutputStream(e.Audio, LocalSettingsHelper.OutputFormat) : null,
                     shouldEndTurn: e.Audio == null && wrapper.Type == ActivityWrapper.ActivityType.Message,
                     shouldStartNewTurn: wrapper.InputHint == ActivityWrapper.InputHintType.ExpectingInput);
-                Debug.WriteLine($"Connector activity received");
+                this.logger.Log($"Connector activity received");
                 this.DialogResponseReceived?.Invoke(payload);
             };
 
@@ -197,6 +207,12 @@ namespace UWPVoiceAssistantSample
                 this.audioSource = source;
                 this.audioSource.DataAvailable += (bytes) =>
                 {
+                    if (!this.started)
+                    {
+                        this.started = true;
+                        this.logger.Log("data available");
+                    }
+
                     this.connectorInputStream?.Write(bytes.ToArray());
                 };
             }
@@ -230,7 +246,6 @@ namespace UWPVoiceAssistantSample
         public async Task CancelSignalVerification()
 #pragma warning restore CS1998 // Async method lacks 'await' operators and will run synchronously
         {
-            Debug.WriteLine("\n\n\n\ncancel\n\n\n\n");
             _ = this.connector.StopKeywordRecognitionAsync();
         }
 

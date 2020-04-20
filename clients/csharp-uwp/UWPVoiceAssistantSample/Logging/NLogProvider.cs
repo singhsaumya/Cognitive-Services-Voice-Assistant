@@ -89,8 +89,10 @@ namespace UWPVoiceAssistantSample
         /// <param name="message"> The message to log via NLog. </param>
         public void Log(LogMessageLevel level, string message)
         {
-            this.logger.Log(ConvertLogLevel(level), message);
-            LogBuffer.Add($"{level + message}");
+            var messageWithDate = DateTime.Now.ToString("hh:mm:ss.fff tt");
+            messageWithDate += " " + message;
+            this.logger.Log(ConvertLogLevel(level), messageWithDate);
+            LogBuffer.Add($"{level + messageWithDate}");
             this.OnLogAvailable();
         }
 
