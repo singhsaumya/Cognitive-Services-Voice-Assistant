@@ -5,6 +5,7 @@ namespace UWPVoiceAssistantSample
 {
     using System;
     using System.Collections.Generic;
+    using System.Threading.Tasks;
     using NLog;
     using Windows.Storage;
 
@@ -18,6 +19,7 @@ namespace UWPVoiceAssistantSample
         /// </summary>
         public static readonly List<string> LogBuffer = new List<string>();
         private Logger logger;
+        private int nextLogIndex = 0;
 
         /// <summary>
         /// Event to indicate a log was generated.
@@ -89,11 +91,15 @@ namespace UWPVoiceAssistantSample
         /// <param name="message"> The message to log via NLog. </param>
         public void Log(LogMessageLevel level, string message)
         {
-            var messageWithDate = DateTime.Now.ToString("hh:mm:ss.fff tt");
-            messageWithDate += " " + message;
-            this.logger.Log(ConvertLogLevel(level), messageWithDate);
+            var messageWithDate = (DateTime.Now.Ticks % 100000000).ToString();
+            messageWithDate += "=" + message;
             LogBuffer.Add($"{level + messageWithDate}");
-            this.OnLogAvailable();
+
+            Task.Run(() =>
+            {
+                this.logger.Log(ConvertLogLevel(level), LogBuffer[this.nextLogIndex++]);
+                this.OnLogAvailable();
+            });
         }
 
         /// <summary>

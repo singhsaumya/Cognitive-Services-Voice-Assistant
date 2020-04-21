@@ -137,6 +137,8 @@ namespace UWPVoiceAssistantSample
 
             this.SignalReceived?.Invoke(detectionOrigin, this.signalNeedsVerification);
 
+            this.logger.Log($"HandleSignalDetection5");
+
             if (this.signalNeedsVerification)
             {
                 this.StartFailsafeTimer();

@@ -17,7 +17,17 @@ namespace UWPVoiceAssistantSample
     public class AgentSessionManager : IAgentSessionManager, IDisposable
     {
         private readonly SemaphoreSlim cachedSessionSemaphore = new SemaphoreSlim(1, 1);
+        private readonly ILogProvider logger;
         private AgentSessionWrapper cachedAgentSession = null;
+        private bool agentInitialized;
+
+        /// <summary>
+        /// Initializes a new instance of the <see cref="AgentSessionManager"/> class.
+        /// </summary>
+        public AgentSessionManager()
+        {
+            this.logger = LogRouter.GetClassLogger();
+        }
 
         /// <summary>
         /// Raised when the state machine for conversational agent state has finished setting
@@ -37,33 +47,38 @@ namespace UWPVoiceAssistantSample
         /// <returns>Cached Conversation session state.</returns>
         public async Task<IAgentSessionWrapper> GetSessionAsync()
         {
-            await this.cachedSessionSemaphore.WaitAsync().ConfigureAwait(false);
-            try
+            if (!this.agentInitialized)
             {
-                if (this.cachedAgentSession == null)
+                await this.cachedSessionSemaphore.WaitAsync().ConfigureAwait(false);
+                try
                 {
-                    this.cachedAgentSession = new AgentSessionWrapper(await ConversationalAgentSession.GetCurrentSessionAsync());
-                    this.cachedAgentSession.InitializeHandlers();
-
-                    this.cachedAgentSession.SignalDetected += this.OnInAppSignalEventDetected;
-
-                    // When the app changes lock state, close the application to prevent duplicates running at once
-                    this.cachedAgentSession.SystemStateChanged += (s, e) =>
+                    if (this.cachedAgentSession == null)
                     {
-                        if (e.SystemStateChangeType == ConversationalAgentSystemStateChangeType.UserAuthentication)
+                        this.cachedAgentSession = new AgentSessionWrapper(await ConversationalAgentSession.GetCurrentSessionAsync());
+                        this.cachedAgentSession.InitializeHandlers();
+
+                        this.cachedAgentSession.SignalDetected += this.OnInAppSignalEventDetected;
+
+                        // When the app changes lock state, close the application to prevent duplicates running at once
+                        this.cachedAgentSession.SystemStateChanged += (s, e) =>
                         {
-                            WindowService.CloseWindow();
-                        }
-                    };
+                            if (e.SystemStateChangeType == ConversationalAgentSystemStateChangeType.UserAuthentication)
+                            {
+                                WindowService.CloseWindow();
+                            }
+                        };
+
+                        this.agentInitialized = true;
+                    }
                 }
-            }
-            catch (Exception ex)
-            {
-                Debug.WriteLine($"Unable to configure a ConversationalAgentSession. Please check your registration with the MVA platform.\r\n{ex.Message}");
-            }
-            finally
-            {
-                this.cachedSessionSemaphore.Release();
+                catch (Exception ex)
+                {
+                    Debug.WriteLine($"Unable to configure a ConversationalAgentSession. Please check your registration with the MVA platform.\r\n{ex.Message}");
+                }
+                finally
+                {
+                    this.cachedSessionSemaphore.Release();
+                }
             }
 
             return this.cachedAgentSession;
@@ -88,7 +103,9 @@ namespace UWPVoiceAssistantSample
             {
                 if (disposing)
                 {
+                    this.agentInitialized = false;
                     this.cachedAgentSession?.Dispose();
+                    this.cachedAgentSession = null;
                     this.cachedSessionSemaphore?.Dispose();
                 }
             }
@@ -96,7 +113,7 @@ namespace UWPVoiceAssistantSample
 
         private void OnInAppSignalEventDetected(ConversationalAgentSession sender, ConversationalAgentSignalDetectedEventArgs args)
         {
-            Debug.WriteLine($"'{sender.Signal.SignalName}' signal detected in session event handler");
+            this.logger.Log($"'{sender.Signal.SignalName}' signal detected in session event handler");
 
             this.SignalDetected?.Invoke(this, DetectionOrigin.FromApplicationObject);
         }

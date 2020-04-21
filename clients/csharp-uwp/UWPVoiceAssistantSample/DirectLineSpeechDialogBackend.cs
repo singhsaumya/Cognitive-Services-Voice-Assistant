@@ -229,10 +229,12 @@ namespace UWPVoiceAssistantSample
         {
             if (!performConfirmation || this.ConfirmationModel == null)
             {
+                this.logger.Log("listen once");
                 _ = this.connector.ListenOnceAsync();
             }
             else
             {
+                this.logger.Log("start keyword turn");
                 var kwsModel = this.ConfirmationModel as KeywordRecognitionModel;
                 _ = this.connector.StartKeywordRecognitionAsync(kwsModel);
             }

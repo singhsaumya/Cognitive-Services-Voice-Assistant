@@ -242,12 +242,15 @@ namespace UWPVoiceAssistantSample
             DetectionOrigin signalOrigin,
             bool signalVerificationRequired)
         {
+            this.logger.Log("Start convo setup");
             var setupSuccessful = await this.SetupConversationAsync(signalOrigin);
             if (!setupSuccessful)
             {
                 this.logger.Log($"DialogManager2::SetupConversationAsync didn't succeed in setting up a conversation (see earlier errors). Aborting conversation.");
                 return;
             }
+
+            this.logger.Log("End convo setup");
 
             await this.StartTurnAsync(signalVerificationRequired);
         }
@@ -262,6 +265,9 @@ namespace UWPVoiceAssistantSample
         protected virtual async Task<bool> SetupConversationAsync(DetectionOrigin signalOrigin)
         {
             var session = await this.agentSessionManager.GetSessionAsync();
+            
+            this.logger.Log("Initialize audio input start");
+
             try
             {
                 if (signalOrigin == DetectionOrigin.FromPushToTalk)
@@ -280,8 +286,14 @@ namespace UWPVoiceAssistantSample
                 return false;
             }
 
+            this.logger.Log("Initialize audio input end");
+
+
             this.dialogBackend.SetAudioSource(this.dialogAudioInput);
+            
+            this.logger.Log("Initialize backend start");
             await this.dialogBackend.InitializeAsync(await this.keywordRegistration.GetConfirmationKeywordFileAsync());
+            this.logger.Log("Initialize backend end");
 
             return true;
         }
@@ -297,18 +309,31 @@ namespace UWPVoiceAssistantSample
         /// <returns> A task to be completed when all common steps are finished. </returns>
         protected virtual async Task StartTurnAsync(bool signalVerificationRequired)
         {
+            this.logger.Log($"Start turn async enter");
+
             var newState = signalVerificationRequired
                 ? ConversationalAgentState.Detecting
                 : ConversationalAgentState.Listening;
+
+            this.logger.Log($"Start changing agent state");
+
             await this.ChangeAgentStateAsync(newState);
+            
+            this.logger.Log($"Finish changing agent state");
 
             await this.dialogBackend.StartAudioTurnAsync(signalVerificationRequired);
+
+            this.logger.Log($"Audio turn kicked off");
 
             var audioToSkip = signalVerificationRequired
                 ? AgentAudioInputProvider.InitialKeywordTrimDuration
                 : TimeSpan.Zero;
             this.dialogAudioInput.DebugAudioCaptureFilesEnabled = LocalSettingsHelper.EnableAudioCaptureFiles;
+            
+            this.logger.Log($"Start input with initial skip");
+
             await this.dialogAudioInput.StartWithInitialSkipAsync(audioToSkip);
+            this.logger.Log($"Start turn async exit");
         }
 
         /// <summary>
@@ -374,9 +399,13 @@ namespace UWPVoiceAssistantSample
 
             this.signalDetectionHelper.SignalReceived += async (DetectionOrigin detectionOrigin, bool signalNeedsVerification) =>
             {
+                this.logger.Log($"Handle signal detected event handler enter");
+
                 await this.StartConversationAsync(
                     detectionOrigin,
                     signalNeedsVerification);
+
+                this.logger.Log($"Handle signal detected event handler exit");
             };
 
             this.signalDetectionHelper.SignalRejected += async (DetectionOrigin origin) =>
