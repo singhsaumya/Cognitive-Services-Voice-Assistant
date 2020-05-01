@@ -30,7 +30,7 @@ namespace UWPVoiceAssistantSampleTests
 
         public bool KeywordEnabledByApp { get; set; }
 
-        public string ConfirmationKeywordModelPath => string.Empty;
+        public string KeywordConfirmationModelPath => string.Empty;
 
         public KeywordRegistration CreateFromFileAsync()
         {

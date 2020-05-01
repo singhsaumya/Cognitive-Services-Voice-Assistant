@@ -3,8 +3,10 @@
 
 namespace UWPVoiceAssistantSample.AudioCommon
 {
+    using Newtonsoft.Json;
     using System;
     using System.Collections.Immutable;
+    using System.ComponentModel;
     using System.Linq;
     using System.Text;
     using Windows.Media.MediaProperties;
@@ -13,6 +15,7 @@ namespace UWPVoiceAssistantSample.AudioCommon
     /// <summary>
     /// An abstraction of and static holder collection for common audio formats used with assistant experiences.
     /// </summary>
+    [JsonConverter(typeof(DialogAudio.DialogAudioJsonConverter))]
     public class DialogAudio
     {
         private const string KeyForSubtype = "subtype";
@@ -178,6 +181,17 @@ namespace UWPVoiceAssistantSample.AudioCommon
             };
 
             return result;
+        }
+
+        private class DialogAudioJsonConverter : JsonConverter
+        {
+            public override bool CanConvert(Type objectType) => objectType == typeof(DialogAudio);
+
+            public override object ReadJson(JsonReader reader, Type objectType, object existingValue, JsonSerializer serializer)
+                => DialogAudio.GetMatchFromLabel((string)reader.Value);
+
+            public override void WriteJson(JsonWriter writer, object value, JsonSerializer serializer)
+                => writer.WriteValue((value as DialogAudio).Label);
         }
     }
 }

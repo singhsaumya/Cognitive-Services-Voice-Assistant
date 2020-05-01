@@ -54,6 +54,7 @@ namespace UWPVoiceAssistantSample
         private bool hypotheizedSpeechToggle;
         private Conversation activeConversation;
         private int logBufferIndex;
+        private FileSystemWatcher configWatcher;
 
         /// <summary>
         /// Initializes a new instance of the <see cref="MainPage"/> class.
@@ -98,7 +99,7 @@ namespace UWPVoiceAssistantSample
             }
 
             this.OutputFormatComboBox.SelectedItem = this.OutputFormatComboBox.Items.FirstOrDefault(item =>
-                item.ToString() == LocalSettingsHelper.OutputFormat.Label);
+                item.ToString() == AppSettings.Instance.OutputFormat.Label);
 
             // Wire a few pieces of UI handling that aren't trivially handled by XAML bindings
             this.AddUIHandlersAsync();
@@ -109,6 +110,16 @@ namespace UWPVoiceAssistantSample
             this.Conversations = new ObservableCollection<Conversation>();
 
             this.ChatHistoryListView.ContainerContentChanging += this.OnChatHistoryListViewContainerChanging;
+
+            AppSettings.Instance.FileChanged += async () =>
+            {
+                await this.RunOnUiThreadAsync(() =>
+                {
+                    this.logger.Log("Change detected in AppSettings file. Reloading.");
+                    AppSettings.Reload();
+                    this.Frame.Navigate(this.GetType());
+                });
+            };
         }
 
         private bool BackgroundTaskRegistered
@@ -224,10 +235,10 @@ namespace UWPVoiceAssistantSample
 
         private void UpdateUIBasedOnToggles()
         {
-            var useSpeechSdk = LocalSettingsHelper.EnableSpeechSDK;
+            var useSpeechSdk = true;
             var visibility = useSpeechSdk ? Visibility.Visible : Visibility.Collapsed;
-            var useKws = useSpeechSdk && LocalSettingsHelper.EnableSecondStageKws;
-            var enableLogs = useSpeechSdk && LocalSettingsHelper.EnableSdkLogging;
+            var useKws = useSpeechSdk && AppSettings.Instance.EnableSecondStageKws;
+            var enableLogs = useSpeechSdk && AppSettings.Instance.EnableSdkLogging;
 
             this.EnableSpeechSDKLoggingToggle.Visibility = visibility;
             this.EnableSecondStageKwsToggle.Visibility = visibility;
@@ -570,101 +581,13 @@ namespace UWPVoiceAssistantSample
             _ = o;
             _ = e;
 
-            // Add FileSystemWatcher to watch config file. If changed set configmodified to true.
-            using (FileSystemWatcher watcher = new FileSystemWatcher())
-            {
-                watcher.Path = Directory.GetCurrentDirectory();
-                watcher.NotifyFilter = NotifyFilters.LastWrite;
-
-                watcher.Filter = "*.json";
-
-                string fileName = "config.json";
-                var file = await Windows.ApplicationModel.Package.Current.InstalledLocation.GetFileAsync(fileName);
-
-                if (file.Path != null)
-                {
-                    await Launcher.LaunchFileAsync(file);
-                    this.logger.Log("Config file opened");
-                    this.logger.Log("Click Load Config to use modified values");
-                }
-
-                this.configModified = true;
-            }
+            await Launcher.LaunchFileAsync(AppSettings.InstanceSourceFile);
         }
 
         private async void LoadConfigClick(object sender, RoutedEventArgs e)
         {
-            var configFile = await StorageFile.GetFileFromApplicationUriAsync(new Uri("ms-appx:///config.json"));
-
-            AppSettings appSettings = AppSettings.Load(configFile.Path);
-
-            var speechKeyModified = LocalSettingsHelper.SpeechSubscriptionKey != appSettings.SpeechSubscriptionKey;
-            var speechRegionModified = LocalSettingsHelper.AzureRegion != appSettings.AzureRegion;
-            var customSpeechIdModified = LocalSettingsHelper.CustomSpeechId != appSettings.CustomSpeechId;
-            var customVoiceIdModified = LocalSettingsHelper.CustomVoiceIds != appSettings.CustomVoiceIds;
-            var customCommandsAppIdModified = LocalSettingsHelper.CustomCommandsAppId != appSettings.CustomCommandsAppId;
-            var botIdModified = LocalSettingsHelper.BotId != appSettings.BotId;
-            var keywordActivationModelPathModified = LocalSettingsHelper.KeywordActivationModelPath != appSettings.KeywordActivationModelPath;
-            var keywordConfirmationModelPathModified = LocalSettingsHelper.KeywordConfirmationModelPath != appSettings.KeywordConfirmationModelPath;
-
-            this.configModified = speechKeyModified || speechRegionModified || customSpeechIdModified || customVoiceIdModified || customCommandsAppIdModified || botIdModified || keywordActivationModelPathModified ||keywordActivationModelPathModified || keywordConfirmationModelPathModified;
-
-            if (this.configModified)
-            {
-                this.logger.Log("Configuration file has been modified");
-
-                if (speechKeyModified)
-                {
-                    LocalSettingsHelper.SpeechSubscriptionKey = appSettings.SpeechSubscriptionKey;
-                    this.logger.Log($"Speech Key: {LocalSettingsHelper.SpeechSubscriptionKey}");
-                }
-
-                if (speechRegionModified)
-                {
-                    LocalSettingsHelper.AzureRegion = appSettings.AzureRegion;
-                    this.logger.Log($"Azure Region: {LocalSettingsHelper.AzureRegion}");
-                }
-
-                if (customSpeechIdModified)
-                {
-                    LocalSettingsHelper.CustomSpeechId = appSettings.CustomSpeechId;
-                    this.logger.Log($"Custom Speech Id: {LocalSettingsHelper.CustomSpeechId}");
-                }
-
-                if (customVoiceIdModified)
-                {
-                    LocalSettingsHelper.CustomVoiceIds = appSettings.CustomVoiceIds;
-                    this.logger.Log($"Custom Voice Id: {LocalSettingsHelper.CustomVoiceIds}");
-                }
-
-                if (customCommandsAppIdModified)
-                {
-                    LocalSettingsHelper.CustomCommandsAppId = appSettings.CustomCommandsAppId;
-                    this.logger.Log($"Custom Commands App Id: {LocalSettingsHelper.CustomCommandsAppId}");
-                }
-
-                if (botIdModified)
-                {
-                    LocalSettingsHelper.BotId = appSettings.BotId;
-                    this.logger.Log($"Bot Id: {LocalSettingsHelper.BotId}");
-                }
-
-                if (keywordActivationModelPathModified)
-                {
-                    LocalSettingsHelper.KeywordActivationModelPath = appSettings.KeywordActivationModelPath;
-                    this.logger.Log($"Keyword Activation Model Path: {LocalSettingsHelper.KeywordActivationModelPath}");
-                }
-
-                if (keywordConfirmationModelPathModified)
-                {
-                    LocalSettingsHelper.KeywordConfirmationModelPath = appSettings.KeywordConfirmationModelPath;
-                    this.logger.Log($"Keyword Confirmation Model Path: {LocalSettingsHelper.KeywordConfirmationModelPath}");
-                }
-            }
-            else
-            {
-                this.logger.Log("No changes in config");
-            }
+            AppSettings.Reload();
+            this.Frame.Navigate(this.GetType());
         }
 
         private void CollapseControls(object sender, RoutedEventArgs e)
@@ -929,7 +852,7 @@ namespace UWPVoiceAssistantSample
 
             var selectedLabel = this.OutputFormatComboBox.SelectedItem.ToString();
             var selectedFormat = DialogAudio.GetMatchFromLabel(selectedLabel);
-            LocalSettingsHelper.OutputFormat = selectedFormat;
+            AppSettings.Instance.OutputFormat = selectedFormat;
         }
 
         private void OnChatHistoryListViewContainerChanging(ListViewBase sender, ContainerContentChangingEventArgs args)
@@ -974,5 +897,9 @@ namespace UWPVoiceAssistantSample
         {
             this.ApplicationStateTeachingTip.IsOpen = true;
         }
+
+        private async Task RunOnUiThreadAsync(Action action)
+            => await this.Dispatcher.RunAsync(CoreDispatcherPriority.Normal, () => action.Invoke());
+
     }
 }

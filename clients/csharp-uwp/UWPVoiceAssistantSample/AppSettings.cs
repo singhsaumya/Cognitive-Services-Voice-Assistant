@@ -5,10 +5,17 @@ namespace UWPVoiceAssistantSample
 {
     using System;
     using System.Collections.Generic;
+    using System.ComponentModel;
     using System.Globalization;
     using System.IO;
     using System.Runtime.CompilerServices;
+    using System.Threading;
+    using System.Threading.Tasks;
     using Newtonsoft.Json;
+    using UWPVoiceAssistantSample.AudioCommon;
+    using Windows.Storage;
+    using Windows.Storage.Search;
+    using Windows.UI.Xaml;
 
     /// <summary>
     /// Bot specific application settings obtained for config.json.
@@ -16,6 +23,16 @@ namespace UWPVoiceAssistantSample
     public class AppSettings
     {
         private static ILogProvider logger = LogRouter.GetClassLogger();
+        private static Lazy<AppSettings> instance;
+        private StorageFile sourceFile;
+        private StorageFolder sourceFolder;
+        private FileSystemWatcher configFolderWatcher;
+
+        public static AppSettings Instance { get => instance.Value; }
+
+        public static StorageFile InstanceSourceFile { get => instance.Value.sourceFile; }
+
+        public event Action FileChanged;
 
         /// <summary>
         /// Gets or sets Speech Subscription Key.
@@ -52,26 +69,97 @@ namespace UWPVoiceAssistantSample
         /// </summary>
         public string KeywordActivationModelPath { get; set; }
 
+        public Version KeywordActivationModelVersion { get; set; } = new Version(1, 0);
+
+        public Version LastUpdatedKeywordActivationModelVersion { get; set; } = new Version(0, 0);
+
         /// <summary>
         /// Gets or sets KeywordConfirmationModelPath.
         /// </summary>
         public string KeywordConfirmationModelPath { get; set; }
 
-        /// <summary>
-        /// Reads and deserializes the configuration file.
-        /// </summary>
-        /// <param name="configFile">config.json.</param>
-        /// <returns>Instance of AppSettings.</returns>
-        public static AppSettings Load(string configFile)
-        {
-            StreamReader file = new StreamReader(configFile);
-            string config = file.ReadToEnd();
-            file.Close();
-            AppSettings instance = JsonConvert.DeserializeObject<AppSettings>(config);
-            ValidateAppSettings(instance);
+        public bool EnableSecondStageKws { get; set; } = true;
 
-            return instance;
+        public bool EnableSdkLogging { get; set; } = false;
+
+        public DialogAudio OutputFormat { get; set; } = DialogAudio.Mpeg24KHz96KBitRateMono;
+
+        public bool EnableAudioCaptureFiles { get; set; } = false;
+
+        static AppSettings()
+        {
+            Reload();
         }
+
+        private AppSettings(StorageFile sourceFile, StorageFolder sourceFolder)
+        {
+            this.sourceFile = sourceFile;
+            this.sourceFolder = sourceFolder;
+            this.configFolderWatcher = new FileSystemWatcher(sourceFolder.Path, sourceFile.Name);
+            this.configFolderWatcher.Changed += (s, e) =>
+            {
+                this.FileChanged.Invoke();
+            };
+            this.configFolderWatcher.NotifyFilter = NotifyFilters.LastWrite;
+            this.configFolderWatcher.EnableRaisingEvents = true;
+
+            var lastTime = File.GetLastWriteTime(sourceFile.Path);
+
+            var query = this.sourceFolder.CreateFileQueryWithOptions(new QueryOptions(CommonFileQuery.DefaultQuery, new string[] { sourceFile.FileType }));
+            query.ContentsChanged += (s, e) =>
+            {
+                var newLastTime = File.GetLastWriteTime(sourceFile.Path);
+                if (newLastTime > lastTime)
+                {
+                    lastTime = newLastTime;
+                    this.FileChanged?.Invoke();
+                }
+            };
+            _ = query.GetFilesAsync();
+        }
+
+        private static readonly Uri DefaultConfigSourceUri = new Uri("ms-appx:///assets/defaultConfig.json");
+        private static readonly StorageFolder ConfigFolder = ApplicationData.Current.LocalFolder;
+        private static readonly string ConfigFilename = "config.json";
+
+        public static async Task<AppSettings> LoadAsync()
+        {
+            var configFile = await ConfigFolder.TryGetItemAsync(ConfigFilename) as StorageFile;
+            if (configFile == null)
+            {
+                var defaultConfig = await StorageFile.GetFileFromApplicationUriAsync(DefaultConfigSourceUri);
+                await defaultConfig.CopyAsync(ConfigFolder, ConfigFilename);
+                configFile = await ConfigFolder.TryGetItemAsync(ConfigFilename) as StorageFile;
+            }
+
+            var settings = await LoadFromStorageFileAsync(configFile);
+            return settings;
+        }
+
+        public static async Task<AppSettings> LoadFromStorageFileAsync(StorageFile configFile)
+        {
+            var configFolder = await configFile.GetParentAsync();
+
+            using (var configStream = await configFile.OpenStreamForReadAsync())
+            using (var streamReader = new StreamReader(configStream))
+            using (var jsonReader = new JsonTextReader(streamReader))
+            {
+                var deserializer = new JsonSerializer();
+                var result = new AppSettings(configFile, configFolder);
+                deserializer.Populate(jsonReader, result);
+                return result;
+            }
+        }
+
+        public static void Reload() => instance = new Lazy<AppSettings>(() =>
+        {
+            var loadTask = Task.Run(async () =>
+            {
+                return await LoadAsync();
+            });
+            loadTask.Wait();
+            return loadTask.Result;
+        });
 
         /// <summary>
         /// Verifies if Speech Subscription Key is provided and parses it to a GUID.

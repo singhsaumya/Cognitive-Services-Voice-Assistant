@@ -132,7 +132,7 @@ namespace UWPVoiceAssistantSample
             var canSkipVerification =
                 detectionOrigin == DetectionOrigin.FromPushToTalk
                 || !session.IsSignalVerificationRequired
-                || !LocalSettingsHelper.EnableSecondStageKws;
+                || !AppSettings.Instance.EnableSecondStageKws;
             this.signalNeedsVerification = !canSkipVerification;
 
             this.SignalReceived?.Invoke(detectionOrigin, this.signalNeedsVerification);

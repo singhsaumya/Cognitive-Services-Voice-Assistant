@@ -78,33 +78,25 @@ namespace UWPVoiceAssistantSample
         /// When not provided, no attempt will be made to associate model data with the
         /// activation keyword.
         /// </summary>
-        public string KeywordActivationModelFilePath { get => LocalSettingsHelper.KeywordActivationModelPath; set => this.KeywordActivationModelFilePath = value; }
+        public string KeywordActivationModelFilePath
+        {
+            get => AppSettings.Instance.KeywordActivationModelPath;
+            set => AppSettings.Instance.KeywordActivationModelPath = value;
+        }
 
         /// <summary>
         /// Gets the available version of the model data associated with an activation keyword.
         /// </summary>
-        public Version AvailableActivationKeywordModelVersion { get; private set; }
+        public Version AvailableActivationKeywordModelVersion
+        {
+            get => AppSettings.Instance.KeywordActivationModelVersion;
+            private set => AppSettings.Instance.KeywordActivationModelVersion = value;
+        }
 
-        /// <summary>
-        /// Gets or sets the last successfully updated model data version associated with the
-        /// activation keyword. This is stored in local settings for later retrieval when the
-        /// data for a keyword may change and need update.
-        /// </summary>
         public Version LastUpdatedActivationKeywordModelVersion
         {
-            get
-            {
-                var key = $"lastKwModelVer_{this.KeywordId}:{this.KeywordModelId}";
-                var value = LocalSettingsHelper.ReadValueWithDefault<string>(key, "0.0.0.0");
-                return Version.Parse(value);
-            }
-
-            set
-            {
-                Contract.Requires(value != null);
-                var key = $"lastKwModelVer_{this.KeywordId}:{this.KeywordModelId}";
-                LocalSettingsHelper.WriteValue(key, value.ToString());
-            }
+            get => AppSettings.Instance.LastUpdatedKeywordActivationModelVersion;
+            set => AppSettings.Instance.LastUpdatedKeywordActivationModelVersion = value;
         }
 
         /// <summary>
@@ -121,7 +113,11 @@ namespace UWPVoiceAssistantSample
         /// Gets or sets the path to the keyword model used for validation of the activation
         /// keyword's result. This may be a file path or an ms-appx application path.
         /// </summary>
-        public string ConfirmationKeywordModelPath { get => LocalSettingsHelper.KeywordConfirmationModelPath; set => this.ConfirmationKeywordModelPath = value; }
+        public string KeywordConfirmationModelPath
+        {
+            get => AppSettings.Instance.KeywordConfirmationModelPath;
+            set => AppSettings.Instance.KeywordConfirmationModelPath = value;
+        }
 
         /// <summary>
         /// Changes the registered keyword using the new inputs.
@@ -149,7 +145,7 @@ namespace UWPVoiceAssistantSample
             this.KeywordActivationModelDataFormat = keywordActivationModelDataFormat;
             this.KeywordActivationModelFilePath = keywordActivationModelFilePath;
             this.AvailableActivationKeywordModelVersion = availableActivationKeywordModelVersion;
-            this.ConfirmationKeywordModelPath = confirmationKeywordModelPath;
+            this.KeywordConfirmationModelPath = confirmationKeywordModelPath;
 
             this.keywordConfiguration = null;
             return await this.GetOrCreateKeywordConfigurationAsync();
@@ -162,11 +158,6 @@ namespace UWPVoiceAssistantSample
         /// <returns>A <see cref="Task"/> that returns on successful keyword setup.</returns>
         public async Task<ActivationSignalDetectionConfiguration> GetOrCreateKeywordConfigurationAsync()
         {
-            if (string.IsNullOrWhiteSpace(this.KeywordActivationModelFilePath) && string.IsNullOrWhiteSpace(this.ConfirmationKeywordModelPath))
-            {
-                await LocalSettingsHelper.CopyConfigAndAssignValues();
-            }
-
             using (await this.creatingKeywordConfigSemaphore.AutoReleaseWaitAsync())
             {
                 if (this.keywordConfiguration != null)
@@ -212,7 +203,7 @@ namespace UWPVoiceAssistantSample
         /// </summary>
         /// <returns>A <see cref="Task"/> representing the asynchronous operation.</returns>
         public Task<StorageFile> GetConfirmationKeywordFileAsync()
-            => this.GetFileFromPathAsync(this.ConfirmationKeywordModelPath);
+            => this.GetFileFromPathAsync(this.KeywordConfirmationModelPath);
 
         /// <summary>
         /// Default Dispose implementation.
@@ -243,7 +234,7 @@ namespace UWPVoiceAssistantSample
                 this.KeywordActivationModelDataFormat = string.Empty;
                 this.KeywordActivationModelFilePath = string.Empty;
                 this.AvailableActivationKeywordModelVersion = null;
-                this.ConfirmationKeywordModelPath = string.Empty;
+                this.KeywordConfirmationModelPath = string.Empty;
 
                 this.disposed = true;
             }

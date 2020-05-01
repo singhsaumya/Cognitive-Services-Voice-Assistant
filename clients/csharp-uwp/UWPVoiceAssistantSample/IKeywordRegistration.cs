@@ -72,7 +72,7 @@ namespace UWPVoiceAssistantSample
         /// Gets  sets the path to the keyword model used for validation of the activation
         /// keyword's result. This may be a file path or an ms-appx application path.
         /// </summary>
-        string ConfirmationKeywordModelPath { get; }
+        string KeywordConfirmationModelPath { get; }
 
         /// <summary>
         /// Changes the registered keyword using the new inputs.

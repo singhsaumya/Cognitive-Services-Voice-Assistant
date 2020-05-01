@@ -199,7 +199,7 @@ namespace UWPVoiceAssistantSample
 
                     var payload = new DialogResponse(
                         messageBody: e.Activity,
-                        messageMedia: e.HasAudio ? new DirectLineSpeechAudioOutputStream(e.Audio, LocalSettingsHelper.OutputFormat) : null,
+                        messageMedia: e.HasAudio ? new DirectLineSpeechAudioOutputStream(e.Audio, AppSettings.Instance.OutputFormat) : null,
                         shouldEndTurn: (e.Audio == null && wrapper.Type == ActivityWrapper.ActivityType.Message) || wrapper.Type == ActivityWrapper.ActivityType.Event,
                         shouldStartNewTurn: wrapper.InputHint == ActivityWrapper.InputHintType.ExpectingInput);
 
@@ -327,7 +327,7 @@ namespace UWPVoiceAssistantSample
             config.SetProperty("SPEECH-AudioThrottleAsPercentageOfRealTime", "9999");
             config.SetProperty("SPEECH-TransmitLengthBeforThrottleMs", "10000");
 
-            var outputLabel = LocalSettingsHelper.OutputFormat.Label.ToLower(CultureInfo.CurrentCulture);
+            var outputLabel = AppSettings.Instance.OutputFormat.Label.ToLower(CultureInfo.CurrentCulture);
             config.SetProperty(PropertyId.SpeechServiceConnection_SynthOutputFormat, outputLabel);
 
             if (!string.IsNullOrEmpty(this.customSpeechId))
@@ -354,13 +354,13 @@ namespace UWPVoiceAssistantSample
 
         private bool TryRefreshConfigValues()
         {
-            var speechKey = LocalSettingsHelper.SpeechSubscriptionKey;
-            var speechRegion = LocalSettingsHelper.AzureRegion;
-            var customSpeechId = LocalSettingsHelper.CustomSpeechId;
-            var customVoiceIds = LocalSettingsHelper.CustomVoiceIds;
-            var customCommandsAppId = LocalSettingsHelper.CustomCommandsAppId;
-            var botId = LocalSettingsHelper.BotId;
-            var enableSdkLogging = LocalSettingsHelper.EnableSdkLogging;
+            var speechKey = AppSettings.Instance.SpeechSubscriptionKey;
+            var speechRegion = AppSettings.Instance.AzureRegion;
+            var customSpeechId = AppSettings.Instance.CustomSpeechId;
+            var customVoiceIds = AppSettings.Instance.CustomVoiceIds;
+            var customCommandsAppId = AppSettings.Instance.CustomCommandsAppId;
+            var botId = AppSettings.Instance.BotId;
+            var enableSdkLogging = AppSettings.Instance.EnableSdkLogging;
 
             if (this.speechKey == speechKey
                 && this.speechRegion == speechRegion

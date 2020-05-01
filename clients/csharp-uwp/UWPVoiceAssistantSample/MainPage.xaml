@@ -155,7 +155,7 @@
                 OffContent="" />
             <ToggleSwitch x:Name="EnableSpeechSDKToggle"
                 IsEnabled="False"
-                IsOn="{x:Bind mvadls:LocalSettingsHelper.EnableSpeechSDK, Mode=TwoWay}"
+                IsOn="true"
                 Grid.Row="3"
                 Grid.Column="0"
                 Grid.ColumnSpan="2"
@@ -163,7 +163,7 @@
                 OnContent="Speech SDK is ON"
                 OffContent="Speech SDK is OFF" />
             <ToggleSwitch x:Name="EnableAudioInputCaptureToggle"
-                IsOn="{x:Bind mvadls:LocalSettingsHelper.EnableAudioCaptureFiles, Mode=TwoWay}"
+                IsOn="{x:Bind mvadls:AppSettings.Instance.EnableAudioCaptureFiles, Mode=TwoWay}"
                 Margin="5,0,0,0"
                 Grid.Row="4"
                 Grid.Column="0"
@@ -171,7 +171,7 @@
                 OnContent="Microphone audio file capture is ON"
                 OffContent="Microphone audio file capture is OFF" />
             <ToggleSwitch x:Name="EnableSpeechSDKLoggingToggle"
-                IsOn="{x:Bind mvadls:LocalSettingsHelper.EnableSdkLogging, Mode=TwoWay}"
+                IsOn="{x:Bind mvadls:AppSettings.Instance.EnableSdkLogging, Mode=TwoWay}"
                 Margin="5,0,0,0"
                 Grid.Row="5"
                 Grid.Column="0"
@@ -179,7 +179,7 @@
                 OnContent="Speech SDK file logging is ON"
                 OffContent="Speech SDK file logging is OFF" />
             <ToggleSwitch x:Name="EnableSecondStageKwsToggle"
-                IsOn="{x:Bind mvadls:LocalSettingsHelper.EnableSecondStageKws, Mode=TwoWay}"
+                IsOn="{x:Bind mvadls:AppSettings.Instance.EnableSecondStageKws, Mode=TwoWay}"
                 Margin="5,0,0,0"
                 Grid.Row="6"
                 Grid.Column="0"

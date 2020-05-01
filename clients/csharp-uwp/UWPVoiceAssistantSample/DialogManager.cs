@@ -306,7 +306,7 @@ namespace UWPVoiceAssistantSample
             var audioToSkip = signalVerificationRequired
                 ? AgentAudioInputProvider.InitialKeywordTrimDuration
                 : TimeSpan.Zero;
-            this.dialogAudioInput.DebugAudioCaptureFilesEnabled = LocalSettingsHelper.EnableAudioCaptureFiles;
+            this.dialogAudioInput.DebugAudioCaptureFilesEnabled = AppSettings.Instance.EnableAudioCaptureFiles;
             await this.dialogAudioInput.StartWithInitialSkipAsync(audioToSkip);
         }
 

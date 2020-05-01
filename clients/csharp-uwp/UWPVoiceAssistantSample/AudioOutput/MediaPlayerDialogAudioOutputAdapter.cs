@@ -5,6 +5,7 @@ namespace UWPVoiceAssistantSample.AudioOutput
 {
     using System;
     using System.Threading.Tasks;
+    using UWPVoiceAssistantSample.AudioCommon;
     using Windows.Media.MediaProperties;
     using Windows.Media.Playback;
 
@@ -80,7 +81,7 @@ namespace UWPVoiceAssistantSample.AudioOutput
         public Task PlayAudioAsync(DialogAudioOutputStream stream)
         {
             this.mediaPlayer.Pause();
-            this.OutputEncoding = LocalSettingsHelper.OutputFormat.Encoding;
+            this.OutputEncoding = AppSettings.Instance.OutputFormat.Encoding;
             this.mediaSource = new DialogAudioOutputMediaSource(stream);
             this.mediaPlayer.Source = this.mediaSource.WindowsMediaSource;
             this.mediaPlayer.Play();

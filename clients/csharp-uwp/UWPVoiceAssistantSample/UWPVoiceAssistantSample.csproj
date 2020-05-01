@@ -167,7 +167,6 @@
     <Compile Include="AudioCommon\IMemoryBufferByteAccess.cs" />
     <Compile Include="IKeywordRegistration.cs" />
     <Compile Include="KeywordRegistration.cs" />
-    <Compile Include="LocalSettingsHelper.cs" />
     <Compile Include="Logging\DiagnosticTraceLogProvider.cs" />
     <Compile Include="Logging\LogRouter.cs" />
     <Compile Include="Logging\ILogProvider.cs" />
@@ -253,7 +252,7 @@
     </PackageReference>
   </ItemGroup>
   <ItemGroup>
-    <None Include="config.json">
+    <None Include="Assets\defaultConfig.json">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </None>
     <AdditionalFiles Include="stylecop.json" />

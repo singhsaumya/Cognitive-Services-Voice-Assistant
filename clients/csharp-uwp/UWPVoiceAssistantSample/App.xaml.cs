@@ -31,7 +31,7 @@ namespace UWPVoiceAssistantSample
         private readonly IAgentSessionManager agentSessionManager;
         private BackgroundTaskDeferral deferral;
         private bool alreadyDisposed = false;
-
+ 
         /// <summary>
         /// Initializes a new instance of the <see cref="App"/> class.
         /// Initializes the singleton application object.  This is the first line of authored code
@@ -45,8 +45,6 @@ namespace UWPVoiceAssistantSample
 
             this.Suspending += this.OnSuspending;
             MVARegistrationHelpers.UnlockLimitedAccessFeature();
-
-            LocalSettingsHelper.CopyConfigAndAssignValues().GetAwaiter();
 
             var keywordRegistration = new KeywordRegistration(
                 "Contoso",

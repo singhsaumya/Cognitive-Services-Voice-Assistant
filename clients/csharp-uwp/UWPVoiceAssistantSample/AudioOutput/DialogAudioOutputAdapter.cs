@@ -6,6 +6,7 @@ namespace UWPVoiceAssistantSample
     using System;
     using System.Threading;
     using System.Threading.Tasks;
+    using UWPVoiceAssistantSample.AudioCommon;
     using UWPVoiceAssistantSample.AudioOutput;
     using Windows.Devices.Enumeration;
     using Windows.Media.Audio;
@@ -38,7 +39,7 @@ namespace UWPVoiceAssistantSample
         {
             this.outputEndedEvent = new AutoResetEvent(false);
             this.graphSemaphore = new SemaphoreSlim(1, 1);
-            this.frameInputEncoding = LocalSettingsHelper.OutputFormat.Encoding;
+            this.frameInputEncoding = AppSettings.Instance.OutputFormat.Encoding;
             this.ConfigureOutputDeviceWatching();
         }
 

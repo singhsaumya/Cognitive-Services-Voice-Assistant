@@ -55,7 +55,7 @@ namespace KeywordRegistrationTests
                     this.keywordRegistration.KeywordActivationModelDataFormat,
                     this.keywordRegistration.KeywordActivationModelFilePath,
                     this.keywordRegistration.AvailableActivationKeywordModelVersion,
-                    this.keywordRegistration.ConfirmationKeywordModelPath);
+                    this.keywordRegistration.KeywordConfirmationModelPath);
                 Assert.AreEqual(this.keywordRegistration.LastUpdatedActivationKeywordModelVersion, this.keywordRegistration.AvailableActivationKeywordModelVersion);
                 Assert.IsTrue(updateKeyword.IsActive);
                 Assert.AreEqual(this.keywordRegistration.KeywordDisplayName, updateKeyword.DisplayName);
@@ -90,7 +90,7 @@ namespace KeywordRegistrationTests
                 this.keywordRegistration.KeywordActivationModelDataFormat,
                 this.keywordRegistration.KeywordActivationModelFilePath,
                 this.keywordRegistration.AvailableActivationKeywordModelVersion,
-                this.keywordRegistration.ConfirmationKeywordModelPath);
+                this.keywordRegistration.KeywordConfirmationModelPath);
 
             Assert.IsTrue(result.AvailabilityInfo.HasPermission);
             Assert.IsTrue(result.AvailabilityInfo.HasSystemResourceAccess);
@@ -171,7 +171,7 @@ namespace KeywordRegistrationTests
         public async Task VerifyActivationAndConfirmationPathsAsyncTest()
         {
             string activationKeywordPath = this.keywordRegistration.KeywordActivationModelFilePath;
-            string confirmationModelPath = this.keywordRegistration.ConfirmationKeywordModelPath;
+            string confirmationModelPath = this.keywordRegistration.KeywordConfirmationModelPath;
             bool activationKeywordPathNull = string.IsNullOrEmpty(activationKeywordPath);
             bool confirmationModelPathNull = string.IsNullOrEmpty(confirmationModelPath);
 
@@ -224,7 +224,7 @@ namespace KeywordRegistrationTests
             keyword.KeywordActivationModelDataFormat,
             keyword.KeywordActivationModelFilePath,
             newVersion,
-            keyword.ConfirmationKeywordModelPath), "Invalid InputValues");
+            keyword.KeywordConfirmationModelPath), "Invalid InputValues");
         }
 
         private async Task<StorageFile> GetStorageFile(string path)
