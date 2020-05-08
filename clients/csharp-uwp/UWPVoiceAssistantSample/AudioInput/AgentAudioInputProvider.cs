@@ -40,6 +40,15 @@ namespace UWPVoiceAssistantSample
         private bool dataAvailableInitialized = false;
         private int bytesToSkip;
         private int bytesAlreadySkipped;
+        private ILogProvider logger;
+
+        /// <summary>
+        /// Initializes a new instance of the <see cref="AgentAudioInputProvider"/> class.
+        /// </summary>
+        public AgentAudioInputProvider()
+        {
+            this.logger = LogRouter.GetClassLogger();
+        }
 
         /// <summary>
         /// Raised when new audio data is available from the producer.
@@ -51,7 +60,7 @@ namespace UWPVoiceAssistantSample
         /// StartWithInitialSkipAsync.
         /// </summary>
         public event Action<List<byte>> DataDiscarded;
-
+        
         /// <summary>
         /// Gets an amount of time experimentally determined to create a reasonable amount of leading audio before
         /// a keyword in an audio stream. Some amount of silence/audio prior to the keyword is necessary for
@@ -254,7 +263,7 @@ namespace UWPVoiceAssistantSample
 
             if (this.agentSession != null)
             {
-                Debug.WriteLine($"{Environment.TickCount} Initializing audio from session");
+                this.logger.Log($"{Environment.TickCount} Initializing audio from session");
                 this.inputNode = await this.agentSession.CreateAudioDeviceInputNodeAsync(this.inputGraph);
             }
             else

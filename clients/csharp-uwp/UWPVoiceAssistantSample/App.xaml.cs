@@ -260,7 +260,8 @@ namespace UWPVoiceAssistantSample
                 // confirmed signal in a background task. Audio should already be flowing. Most
                 // commonly, this is when an application can be brought to the foreground.
                 var session = await this.agentSessionManager.GetSessionAsync();
-                await session.RequestForegroundActivationAsync();
+                var success = await session.RequestForegroundActivationAsync();
+                this.logger.Log(LogMessageLevel.Noise, $"Foreground activation {(success == ConversationalAgentSessionUpdateResponse.Success ? "succeeded" : "failed")}");
             }
         }
 

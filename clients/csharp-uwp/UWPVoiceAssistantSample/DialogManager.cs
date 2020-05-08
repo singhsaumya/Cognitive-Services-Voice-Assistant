@@ -251,6 +251,7 @@ namespace UWPVoiceAssistantSample
                 return;
             }
 
+            this.logger.Log("START TURN");
             await this.StartTurnAsync(signalVerificationRequired);
         }
 
@@ -277,6 +278,7 @@ namespace UWPVoiceAssistantSample
             }
             catch (Exception ex)
             {
+                this.logger.Log($"{ex.Message}");
                 this.logger.Log($"Unable to acquire MVA 1st-pass audio. Rejecting signal.\n{ex.HResult}: {ex.Message}");
                 await this.FinishConversationAsync();
                 return false;
@@ -304,6 +306,8 @@ namespace UWPVoiceAssistantSample
                 : ConversationalAgentState.Listening;
             await this.ChangeAgentStateAsync(newState);
 
+            this.logger.Log("Starting turn");
+
             await this.dialogBackend.StartAudioTurnAsync(signalVerificationRequired);
 
             var audioToSkip = signalVerificationRequired
@@ -311,6 +315,8 @@ namespace UWPVoiceAssistantSample
                 : TimeSpan.Zero;
             this.dialogAudioInput.DebugAudioCaptureFilesEnabled = LocalSettingsHelper.EnableAudioCaptureFiles;
             await this.dialogAudioInput.StartWithInitialSkipAsync(audioToSkip);
+
+            this.logger.Log("Turn started");
         }
 
         /// <summary>
@@ -378,6 +384,7 @@ namespace UWPVoiceAssistantSample
 
             this.signalDetectionHelper.SignalReceived += async (DetectionOrigin detectionOrigin, bool signalNeedsVerification) =>
             {
+                this.logger.Log("SIGNAL RECEIVED");
                 await this.StartConversationAsync(
                     detectionOrigin,
                     signalNeedsVerification);
