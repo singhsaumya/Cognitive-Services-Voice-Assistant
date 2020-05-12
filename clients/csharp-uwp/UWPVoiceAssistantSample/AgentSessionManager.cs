@@ -60,7 +60,7 @@ namespace UWPVoiceAssistantSample
                     {
                         if (e.SystemStateChangeType == ConversationalAgentSystemStateChangeType.UserAuthentication)
                         {
-                            WindowService.CloseWindow();
+                            //WindowService.CloseWindow();
                         }
                     };
                 }

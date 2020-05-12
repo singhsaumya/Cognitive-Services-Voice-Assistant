@@ -21,6 +21,7 @@
         <uap:SplashScreen Image="Assets\SplashScreen.png" />
       </uap:VisualElements>
       <Extensions>
+        <uap:Extension Category="windows.lockScreenCall" />
         <uap:Extension Category="windows.aboveLockScreen" />
       </Extensions>
     </Application>

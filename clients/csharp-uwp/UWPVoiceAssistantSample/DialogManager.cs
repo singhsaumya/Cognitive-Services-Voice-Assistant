@@ -32,6 +32,7 @@ namespace UWPVoiceAssistantSample
         private IKeywordRegistration keywordRegistration;
         private IAgentSessionManager agentSessionManager;
         private DialogResponseQueue dialogResponseQueue;
+        private SignalResolutionEventArgs signalConfirmedEventHandler;
 
         /// <summary>
         /// Initializes a new instance of the <see cref="DialogManager{TInputType}"/> class.
@@ -273,7 +274,7 @@ namespace UWPVoiceAssistantSample
                 }
                 else
                 {
-                    await this.dialogAudioInput.InitializeFromAgentSessionAsync(session);
+                    await this.dialogAudioInput.InitializeFromNowAsync();
                 }
             }
             catch (Exception ex)
@@ -400,11 +401,21 @@ namespace UWPVoiceAssistantSample
                 this.SignalRejected.Invoke(origin);
             };
 
-            this.signalDetectionHelper.SignalConfirmed += async (DetectionOrigin origin) =>
+            this.signalConfirmedEventHandler = async (DetectionOrigin origin) =>
             {
                 await this.ChangeAgentStateAsync(ConversationalAgentState.Listening);
                 this.SignalConfirmed.Invoke(origin);
+
+                var session = await this.agentSessionManager.GetSessionAsync();
+
+                if (!session.IsUserAuthenticated)
+                {
+                    var success = await session.RequestForegroundActivationAsync();
+                    this.logger.Log("Activated above lock");
+                }
             };
+
+            this.signalDetectionHelper.SignalConfirmed += this.signalConfirmedEventHandler;
         }
 
         private void OnKeywordRecognizing(string recognitionText)

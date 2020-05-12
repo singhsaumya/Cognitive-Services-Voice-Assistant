@@ -3,6 +3,7 @@
 
 namespace UWPVoiceAssistantSample
 {
+    using Microsoft.Extensions.DependencyInjection;
     using System;
     using System.Collections.Generic;
     using System.Collections.ObjectModel;
@@ -10,26 +11,21 @@ namespace UWPVoiceAssistantSample
     using System.Globalization;
     using System.IO;
     using System.Linq;
-    using System.Threading;
     using System.Threading.Tasks;
-    using System.Xml;
-    using Microsoft.Extensions.DependencyInjection;
-    using Microsoft.UI.Xaml.Controls;
-    using Newtonsoft.Json;
     using UWPVoiceAssistantSample.AudioCommon;
     using UWPVoiceAssistantSample.AudioInput;
     using Windows.ApplicationModel.ConversationalAgent;
+    using Windows.ApplicationModel.LockScreen;
+    using Windows.Foundation;
     using Windows.Security.Authorization.AppCapabilityAccess;
     using Windows.Storage;
     using Windows.System;
     using Windows.System.Power;
     using Windows.UI;
     using Windows.UI.Core;
-    using Windows.UI.Notifications;
     using Windows.UI.ViewManagement;
     using Windows.UI.Xaml;
     using Windows.UI.Xaml.Controls;
-    using Windows.UI.Xaml.Documents;
     using Windows.UI.Xaml.Media;
 
     /// <summary>
@@ -54,6 +50,18 @@ namespace UWPVoiceAssistantSample
         private bool hypotheizedSpeechToggle;
         private Conversation activeConversation;
         private int logBufferIndex;
+        private RoutedEventHandler dismissButtonClickHandler;
+        private RoutedEventHandler microphoneButtonClickHandler;
+        private RoutedEventHandler resetButtonClickHandler;
+        private RoutedEventHandler clearLogsButtonHandler;
+        private DialogStateChangeEventArgs dialogStateChangedEventHandler;
+        private EventHandler<string> speechRecognizingEventHandler;
+        private EventHandler<string> speechRecognizedEventHandler;
+        private EventHandler logAvailableEventHandler;
+        private EventHandler<DialogResponse> dialogResponseReceivedEventHandler;
+        private Action handleActionWithUpdateUISharedState;
+        private TypedEventHandler<AppCapability, AppCapabilityAccessChangedEventArgs> appCapabilityChangedEventHandler;
+        private TypedEventHandler<ConversationalAgentSession, ConversationalAgentSystemStateChangedEventArgs> systemStateChangedEventHandler;
 
         /// <summary>
         /// Initializes a new instance of the <see cref="MainPage"/> class.
@@ -109,6 +117,12 @@ namespace UWPVoiceAssistantSample
             this.Conversations = new ObservableCollection<Conversation>();
 
             this.ChatHistoryListView.ContainerContentChanging += this.OnChatHistoryListViewContainerChanging;
+
+            LockApplicationHost lockHost = LockApplicationHost.GetForCurrentView();
+            if (lockHost != null)
+            {
+                lockHost.Unlocking += (s, e) => this.AddUIHandlersAsync();
+            }
         }
 
         private bool BackgroundTaskRegistered
@@ -126,27 +140,68 @@ namespace UWPVoiceAssistantSample
             this.AddSystemAvailabilityHandlers();
             this.AddDialogHandlersAsync();
 
-            this.DismissButton.Click += (_, __) =>
+            //if (this.dismissButtonClickHandler != null)
+            //{
+            //    this.DismissButton.Click -= this.dismissButtonClickHandler;
+            //}
+
+            this.dismissButtonClickHandler = async (_, __) =>
             {
-                WindowService.CloseWindow();
+                LockApplicationHost lockHost = LockApplicationHost.GetForCurrentView();
+                if (lockHost != null)
+                {
+                    lockHost.RequestUnlock();
+                }
             };
-            this.MicrophoneButton.Click += async (_, __) =>
+
+            this.DismissButton.Click += this.dismissButtonClickHandler;
+
+            //if (this.microphoneButtonClickHandler != null)
+            //{
+            //    this.MicrophoneButton.Click -= this.microphoneButtonClickHandler;
+            //}
+
+            this.microphoneButtonClickHandler = async (_, __) =>
             {
                 this.dialogManager.HandleSignalDetection(DetectionOrigin.FromPushToTalk);
                 await this.UpdateUIForSharedStateAsync();
             };
-            this.ResetButton.Click += async (_, __) =>
+
+            this.MicrophoneButton.Click += this.microphoneButtonClickHandler;
+
+            //if (this.resetButtonClickHandler != null)
+            //{
+            //    this.ResetButton.Click -= this.resetButtonClickHandler;
+            //}
+
+            this.resetButtonClickHandler = async (_, __) =>
             {
                 await this.dialogManager.FinishConversationAsync();
                 await this.dialogManager.StopAudioPlaybackAsync();
+
+                this.logger.Log("reset button clicked");
                 this.Conversations.Clear();
                 this.RefreshStatus();
             };
-            this.ClearLogsButton.Click += async (_, __)
-                => await this.Dispatcher.RunAsync(CoreDispatcherPriority.Normal, async () =>
+
+            this.ResetButton.Click += this.resetButtonClickHandler;
+
+            //if (this.clearLogsButtonHandler != null)
+            //{
+            //    this.ClearLogsButton.Click -= this.clearLogsButtonHandler;
+            //}
+
+            this.clearLogsButtonHandler = async (_, __) =>
+            {
+                DispatchedHandler eventHandler = () =>
                 {
                     this.ChangeLogStackPanel.Children.Clear();
-                });
+                };
+
+                await this.Dispatcher.RunAsync(CoreDispatcherPriority.Normal, eventHandler);
+            };
+
+            this.ClearLogsButton.Click += this.clearLogsButtonHandler;
 
             this.OpenLogLocationButton.Click += async (_, __)
                 => await Launcher.LaunchFolderAsync(ApplicationData.Current.LocalFolder);
@@ -165,25 +220,47 @@ namespace UWPVoiceAssistantSample
         private async Task DoKeywordSetupAsync()
         {
             var keywordConfig = await this.keywordRegistration.GetOrCreateKeywordConfigurationAsync();
-            keywordConfig.AvailabilityChanged += async (s, e)
-                => await this.UpdateUIForSharedStateAsync();
+            TypedEventHandler<ActivationSignalDetectionConfiguration, DetectionConfigurationAvailabilityChangedEventArgs> comEventHandler = async (s, e) =>
+            {
+                await this.UpdateUIForSharedStateAsync();
+            };
+            keywordConfig.AvailabilityChanged += comEventHandler;
             await this.UpdateUIForSharedStateAsync();
         }
 
         private async void AddSystemAvailabilityHandlers()
         {
+            this.handleActionWithUpdateUISharedState = async () => await this.UpdateUIForSharedStateAsync();
+            this.appCapabilityChangedEventHandler = async (s, e) => await this.UpdateUIForSharedStateAsync();
+            this.systemStateChangedEventHandler = async (s, e) => await this.UpdateUIForSharedStateAsync();
+            
             var inputControl = await AudioCaptureControl.GetInstanceAsync();
-            inputControl.MicrophoneCapability.AccessChanged += async (s, e)
-                => await this.UpdateUIForSharedStateAsync();
-            inputControl.AudioInputDeviceChanged += async ()
-                => await this.UpdateUIForSharedStateAsync();
-            inputControl.InputVolumeStateChanged += async ()
-                => await this.UpdateUIForSharedStateAsync();
+
+            if (this.handleActionWithUpdateUISharedState != null)
+            {
+                inputControl.AudioInputDeviceChanged -= this.handleActionWithUpdateUISharedState;
+                inputControl.InputVolumeStateChanged -= this.handleActionWithUpdateUISharedState;
+            }
+
+            inputControl.AudioInputDeviceChanged += this.handleActionWithUpdateUISharedState;
+            inputControl.InputVolumeStateChanged += this.handleActionWithUpdateUISharedState;
+
             var session = await this.agentSessionManager.GetSessionAsync();
+
+            if (this.appCapabilityChangedEventHandler != null)
+            {
+                inputControl.MicrophoneCapability.AccessChanged -= this.appCapabilityChangedEventHandler;
+                if (session != null)
+                {
+                    session.SystemStateChanged -= this.systemStateChangedEventHandler;
+                }
+            }
+
+            inputControl.MicrophoneCapability.AccessChanged += this.appCapabilityChangedEventHandler;
+
             if (session != null)
             {
-                session.SystemStateChanged += async (s, e)
-                    => await this.UpdateUIForSharedStateAsync();
+                session.SystemStateChanged += this.systemStateChangedEventHandler;
             }
 
             PowerManager.EnergySaverStatusChanged += async (s, e)
@@ -193,32 +270,69 @@ namespace UWPVoiceAssistantSample
         private void AddDialogHandlersAsync()
         {
             // Ensure we update UI state (like buttons) when detection begins
-            this.dialogManager.DialogStateChanged += async (s, e)
-                => await this.UpdateUIForSharedStateAsync();
+            if (this.dialogStateChangedEventHandler != null)
+            {
+                this.dialogManager.DialogStateChanged -= this.dialogStateChangedEventHandler;
+            }
 
-            // TODO: This is probably too busy for hypothesis events; better way of showing intermediate results?
-            this.dialogManager.SpeechRecognizing += (s, e) =>
+            this.dialogStateChangedEventHandler = async (s, e)
+                => await this.UpdateUIForSharedStateAsync();
+            this.dialogManager.DialogStateChanged += this.dialogStateChangedEventHandler;
+
+            if (this.speechRecognizingEventHandler != null)
+            {
+                this.dialogManager.SpeechRecognizing -= this.speechRecognizingEventHandler;
+            }
+            this.speechRecognizingEventHandler = (s, e) =>
             {
                 this.AddHypothesizedSpeechToTextBox(e);
             };
-            this.dialogManager.SpeechRecognized += (s, e) =>
+            this.dialogManager.SpeechRecognizing += this.speechRecognizingEventHandler;
+
+            if (this.speechRecognizedEventHandler != null)
+            {
+                this.dialogManager.SpeechRecognized -= this.speechRecognizedEventHandler;
+            }
+
+            this.speechRecognizedEventHandler = (s, e) =>
             {
                 this.AddMessageToStatus(e);
             };
-            this.dialogManager.DialogResponseReceived += (s, e) =>
+
+            this.dialogManager.SpeechRecognized += this.speechRecognizedEventHandler;
+
+            if (this.dialogResponseReceivedEventHandler != null)
+            {
+                Debug.WriteLine($"refresh the thing: {this.Dispatcher.HasThreadAccess}");
+                
+                this.dialogManager.DialogResponseReceived -= this.dialogResponseReceivedEventHandler;
+            }
+
+            this.dialogResponseReceivedEventHandler = (s, e) =>
             {
                 // TODO: Duplicate wrapper creation unnecessary
                 var wrapper = new ActivityWrapper(e.MessageBody.ToString());
                 if (wrapper.Type == ActivityWrapper.ActivityType.Message)
                 {
+                    Debug.WriteLine($"test: {this.Dispatcher.HasThreadAccess}");
+
                     this.AddBotResponse(wrapper.Message);
                 }
             };
 
-            this.logger.LogAvailable += (s, e) =>
+            this.dialogManager.DialogResponseReceived += this.dialogResponseReceivedEventHandler;
+
+            if (this.logAvailableEventHandler != null)
+            {
+                this.logger.LogAvailable -= this.logAvailableEventHandler;
+            }
+
+            this.logAvailableEventHandler = (s, e) =>
             {
                 this.WriteLog();
             };
+
+            this.logger.LogAvailable += this.logAvailableEventHandler;
             this.logger.Log(LogMessageLevel.Noise, "Main page created, UI rendering");
         }
 
@@ -239,8 +353,7 @@ namespace UWPVoiceAssistantSample
 
         private async Task UpdateUIForSharedStateAsync()
         {
-            // UI changes must be performed on the UI thread.
-            await this.Dispatcher.RunAsync(CoreDispatcherPriority.Normal, async () =>
+            DispatchedHandler eventHandler = async () =>
             {
                 this.RefreshStatus();
 
@@ -361,7 +474,10 @@ namespace UWPVoiceAssistantSample
                 this.ApplicationStateBadge.Content = $"{teachingTipCount} Warnings";
 
                 this.DismissButton.Visibility = session.IsUserAuthenticated ? Visibility.Collapsed : Visibility.Visible;
-            });
+            };
+
+            // UI changes must be performed on the UI thread.
+            await this.Dispatcher.RunAsync(CoreDispatcherPriority.Normal, eventHandler);
         }
 
         private async void RefreshStatus()
@@ -379,7 +495,7 @@ namespace UWPVoiceAssistantSample
 
         private void AddBotResponse(string message)
         {
-            _ = this.Dispatcher.RunAsync(CoreDispatcherPriority.Normal, () =>
+            DispatchedHandler eventHandler = () =>
             {
                 this.Conversations.Add(new Conversation
                 {
@@ -387,12 +503,13 @@ namespace UWPVoiceAssistantSample
                     Time = DateTime.Now.ToString(CultureInfo.CurrentCulture),
                     Sent = false,
                 });
-            });
+            };
+            _ = this.Dispatcher.RunAsync(CoreDispatcherPriority.Normal, eventHandler);
         }
 
         private void AddHypothesizedSpeechToTextBox(string message)
         {
-            _ = this.Dispatcher.RunAsync(CoreDispatcherPriority.Normal, () =>
+            DispatchedHandler eventHandler = () =>
             {
                 if (this.hypotheizedSpeechToggle)
                 {
@@ -412,12 +529,14 @@ namespace UWPVoiceAssistantSample
 
                     this.Conversations.Last().Body = message;
                 }
-            });
+            };
+
+            _ = this.Dispatcher.RunAsync(CoreDispatcherPriority.Normal, eventHandler);
         }
 
         private void AddMessageToStatus(string message)
         {
-            _ = this.Dispatcher.RunAsync(CoreDispatcherPriority.Normal, () =>
+            DispatchedHandler eventHandler = () =>
             {
                 if (this.activeConversation == null)
                 {
@@ -433,7 +552,8 @@ namespace UWPVoiceAssistantSample
 
                 this.activeConversation.Body = message;
                 this.activeConversation = null;
-            });
+            };
+            _ = this.Dispatcher.RunAsync(CoreDispatcherPriority.Normal, eventHandler);
 
             this.RefreshStatus();
         }
@@ -517,7 +637,7 @@ namespace UWPVoiceAssistantSample
 
         private async void WriteLog()
         {
-            await this.Dispatcher.RunAsync(CoreDispatcherPriority.Normal, () =>
+            DispatchedHandler eventHandler = () =>
             {
                 int nextLogIndex = this.logBufferIndex;
                 for (; nextLogIndex < this.logger.LogBuffer.Count; nextLogIndex++)
@@ -539,12 +659,14 @@ namespace UWPVoiceAssistantSample
                 this.logBufferIndex = nextLogIndex;
 
                 this.ChangeLogScrollViewer.ChangeView(0.0f, double.MaxValue, 1.0f);
-            });
+            };
+
+            await this.Dispatcher.RunAsync(CoreDispatcherPriority.Normal, eventHandler);
         }
 
         private async void FilterLogs()
         {
-            await this.Dispatcher.RunAsync(CoreDispatcherPriority.Normal, () =>
+            DispatchedHandler eventHandler = () =>
             {
                 foreach (TextBlock textBlock in this.informationLogs)
                 {
@@ -562,7 +684,9 @@ namespace UWPVoiceAssistantSample
                 }
 
                 this.ChangeLogScrollViewer.ChangeView(0.0f, double.MaxValue, 1.0f);
-            });
+            };
+
+            await this.Dispatcher.RunAsync(CoreDispatcherPriority.Normal, eventHandler);
         }
 
         private async void OpenConfigClick(object o, RoutedEventArgs e)
@@ -1003,12 +1127,9 @@ namespace UWPVoiceAssistantSample
             await Launcher.LaunchFolderAsync(localFolder, launchOption);
         }
 
-        private async void TriggerLogAvailable(object sender, RoutedEventArgs e)
+        private void TriggerLogAvailable(object sender, RoutedEventArgs e)
         {
-            await this.Dispatcher.RunAsync(CoreDispatcherPriority.Normal, async () =>
-            {
-                this.FilterLogs();
-            });
+            this.FilterLogs();
         }
 
         private void ApplicationStateBadgeClick(object sender, RoutedEventArgs e)
