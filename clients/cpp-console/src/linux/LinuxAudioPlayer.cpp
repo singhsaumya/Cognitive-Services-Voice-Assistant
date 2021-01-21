@@ -14,6 +14,7 @@ using namespace AudioPlayer;
 
 LinuxAudioPlayer::LinuxAudioPlayer()
 {
+    m_shuttingDown = false;
     m_state = AudioPlayerState::UNINITIALIZED;
     m_playerThread = std::thread(&LinuxAudioPlayer::PlayerThreadMain, this);
 }
@@ -160,7 +161,7 @@ void LinuxAudioPlayer::PlayerThreadMain()
         lk.unlock();
         if (m_state == AudioPlayerState::PAUSED)
         {
-            Initialize();
+            snd_pcm_prepare(m_playback_handle);
         }
 
         while (m_audioQueue.size() > 0)
@@ -183,8 +184,8 @@ void LinuxAudioPlayer::PlayerThreadMain()
             case PlayerEntryType::BYTE_ARRAY:
                 PlayByteBuffer(entry);
                 break;
-            case PlayerEntryType::PULL_AUDIO_OUTPUT_STREM:
-                PlayPullAudioOutputStream(entry);
+            case PlayerEntryType::PULL_AUDIO_OUTPUT_STREAM:
+                PlayAudioPlayerStream(entry);
                 break;
             default:
                 fprintf(stderr, "Unknown Audio Player Entry type\n");
@@ -195,14 +196,14 @@ void LinuxAudioPlayer::PlayerThreadMain()
 
 }
 
-void LinuxAudioPlayer::PlayPullAudioOutputStream(std::shared_ptr<AudioPlayerEntry> pEntry)
+void LinuxAudioPlayer::PlayAudioPlayerStream(std::shared_ptr<AudioPlayerEntry> pEntry)
 {
     size_t playBufferSize = GetBufferSize();
     unsigned int bytesRead = 0;
     std::unique_ptr<unsigned char[]> playBuffer = std::make_unique<unsigned char[]>(playBufferSize);
     do
     {
-        bytesRead = pEntry->m_pullStream->Read(playBuffer.get(), playBufferSize);
+        bytesRead = pEntry->m_audioPlayerStream->Read(playBuffer.get(), playBufferSize);
         WriteToALSA(playBuffer.get());
     } while (bytesRead > 0 && m_canceled == false);
 }
@@ -260,7 +261,7 @@ int LinuxAudioPlayer::Play(uint8_t* buffer, size_t bufferSize)
     return rc;
 }
 
-int LinuxAudioPlayer::Play(std::shared_ptr<Microsoft::CognitiveServices::Speech::Audio::PullAudioOutputStream> pStream)
+int LinuxAudioPlayer::Play(std::shared_ptr<IAudioPlayerStream> pStream)
 {
     int rc = 0;
     if (m_state == AudioPlayerState::UNINITIALIZED)
@@ -294,7 +295,6 @@ int LinuxAudioPlayer::Stop()
 
     //tell alsa to drop any frames in buffer
     snd_pcm_drop(m_playback_handle);
-    snd_pcm_close(m_playback_handle);
     m_state = AudioPlayerState::PAUSED;
 
     //clear the audio queue safely

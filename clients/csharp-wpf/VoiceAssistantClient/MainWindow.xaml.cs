@@ -56,7 +56,19 @@ namespace VoiceAssistantClient
             Services.Tracker.Configure(this.settings).Apply();
 
             this.renderer = new AdaptiveCardRenderer();
-            this.renderer.UseXceedElementRenderers();
+
+            /*
+              Xceed Enhanced Input Package
+              This optional package enhances the Adaptive Card input controls beyond what WPF provides out of the box.
+              To enable it:
+              1. Add the NuGet package Extended.Wpf.Toolkit by Xceed to the project
+              2. Add the NuGet package AdaptiveCards.Rendering.Wpf.Xceed by Microsoft to the project
+              3. Uncomment the one line below
+              This option is not included here because of its license terms.
+              For more info: https://docs.microsoft.com/en-us/adaptive-cards/sdk/rendering-cards/net-wpf/getting-started
+            */
+            // this.renderer.UseXceedElementRenderers();
+
             var configFile = Path.Combine(System.Reflection.Assembly.GetExecutingAssembly().Location, "AdaptiveCardsHostConfig.json");
             if (File.Exists(configFile))
             {
@@ -375,6 +387,7 @@ namespace VoiceAssistantClient
                 if (!string.IsNullOrWhiteSpace(e.Result.Text) && e.Result.Reason == ResultReason.RecognizedSpeech)
                 {
                     this.Messages.Add(new MessageDisplay(e.Result.Text, Sender.User));
+                    this.ConversationView.ConversationHistory.ScrollIntoView(this.ConversationView.ConversationHistory.Items[this.ConversationView.ConversationHistory.Items.Count - 1]);
                 }
             });
         }
@@ -457,6 +470,7 @@ namespace VoiceAssistantClient
                             return rendered?.FrameworkElement;
                         });
                     this.Messages.Add(new MessageDisplay(activity.Text, Sender.Bot, renderedCards));
+                    this.ConversationView.ConversationHistory.ScrollIntoView(this.ConversationView.ConversationHistory.Items[this.ConversationView.ConversationHistory.Items.Count - 1]);
                 }
             });
         }
@@ -616,6 +630,7 @@ namespace VoiceAssistantClient
             this.Activities.Add(new ActivityDisplay(jsonConnectorActivity, bfActivity, Sender.User));
             string id = this.connector.SendActivityAsync(jsonConnectorActivity).Result;
             Debug.WriteLine($"SendActivityAsync called, id = {id}");
+            this.ConversationView.ConversationHistory.ScrollIntoView(this.ConversationView.ConversationHistory.Items[this.ConversationView.ConversationHistory.Items.Count - 1]);
         }
 
         private void ExportActivityLog_Click(object sender, RoutedEventArgs e)
@@ -684,7 +699,11 @@ namespace VoiceAssistantClient
         {
             if (Thread.CurrentThread != this.statusOverlay.Dispatcher.Thread)
             {
-                this.RunOnUiThread(() => this.UpdateStatus(msg, tentative));
+                this.RunOnUiThread(() =>
+                {
+                    this.UpdateStatus(msg, tentative);
+                    this.ConversationView.ConversationHistory.ScrollIntoView(this.ConversationView.ConversationHistory.Items[this.ConversationView.ConversationHistory.Items.Count - 1]);
+                });
                 return;
             }
 

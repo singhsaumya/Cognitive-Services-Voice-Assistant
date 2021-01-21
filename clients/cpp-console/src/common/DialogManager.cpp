@@ -10,15 +10,31 @@ using namespace Microsoft::CognitiveServices::Speech;
 using namespace Microsoft::CognitiveServices::Speech::Audio;
 using namespace Microsoft::CognitiveServices::Speech::Dialog;
 using namespace AudioPlayer;
+using namespace MicMuter;
 
 DialogManager::DialogManager(shared_ptr<AgentConfiguration> agentConfig)
 {
     _agentConfig = agentConfig;
 
+    SetDeviceStatus(DeviceStatus::Initializing);
+
     InitializeDialogServiceConnectorFromMicrophone();
     InitializePlayer();
+    InitializeMuter();
     AttachHandlers();
     InitializeConnection();
+
+    // Activate keyword listening on start up if keyword model file exists
+    if (_agentConfig->KeywordRecognitionModel().length() > 0)
+    {
+        StartKws();
+    }
+    else
+    {
+        SetKeywordActivationState(KeywordActivationState::NotSupported);
+    }
+
+    SetDeviceStatus(DeviceStatus::Ready);
 }
 
 DialogManager::DialogManager(shared_ptr<AgentConfiguration> agentConfig, string audioFilePath)
@@ -26,36 +42,41 @@ DialogManager::DialogManager(shared_ptr<AgentConfiguration> agentConfig, string 
     _agentConfig = agentConfig;
     _audioFilePath = audioFilePath;
 
+    SetDeviceStatus(DeviceStatus::Initializing);
+
     InitializeDialogServiceConnectorFromFile();
     InitializePlayer();
+    InitializeMuter();
     AttachHandlers();
     InitializeConnection();
+
+    SetDeviceStatus(DeviceStatus::Ready);
 }
 
 void DialogManager::InitializeDialogServiceConnectorFromMicrophone()
 {
     log_t("Configuration loaded. Creating connector...");
-    
+
     // MAS stands for Microsoft Audio Stack
-    #ifdef MAS
-        auto config = _agentConfig->AsDialogServiceConfig();
-        auto audioConfig = AudioConfig::FromMicrophoneInput(_agentConfig->_linuxCaptureDeviceName);
-        config->SetProperty("MicArrayGeometryConfigFile", _agentConfig->_customMicConfigPath);
-        _dialogServiceConnector = DialogServiceConnector::FromConfig(config, audioConfig);
-    #endif
-    #ifndef MAS
-        _dialogServiceConnector = DialogServiceConnector::FromConfig(_agentConfig->AsDialogServiceConfig());
-    #endif
+#ifdef MAS
+    auto config = _agentConfig->AsDialogServiceConfig();
+    auto audioConfig = AudioConfig::FromMicrophoneInput(_agentConfig->_linuxCaptureDeviceName);
+    config->SetProperty("MicArrayGeometryConfigFile", _agentConfig->_customMicConfigPath);
+    _dialogServiceConnector = DialogServiceConnector::FromConfig(config, audioConfig);
+#endif
+#ifndef MAS
+    _dialogServiceConnector = DialogServiceConnector::FromConfig(_agentConfig->AsDialogServiceConfig());
+#endif
     log_t("Connector created");
 }
 
 void DialogManager::InitializePlayer()
 {
-    if(_agentConfig->_barge_in_supported == "true")
+    if (_agentConfig->_barge_in_supported == "true")
     {
         _bargeInSupported = true;
     }
-    
+
     if (_agentConfig->_volume > 0)
     {
         _volumeOn = true;
@@ -69,7 +90,25 @@ void DialogManager::InitializePlayer()
         _player->Initialize();
         _player->SetVolume(_agentConfig->_volume);
     }
+}
 
+void DialogManager::InitializeMuter()
+{
+#ifdef LINUX
+    _muter = make_shared<LinuxMicMuter>();
+#endif
+#ifdef WINDOWS
+    _muter = make_shared<WindowsMicMuter>();
+#endif
+
+    string result = (_muter->Initialize() == 0) ? "succeeded." : "failed.";
+    log_t("Initializing Microphone Muter " + result);
+}
+
+void DialogManager::SetDeviceStatus(const DeviceStatus status)
+{
+    _deviceStatus = status;
+    DeviceStatusIndicators::SetStatus(_deviceStatus, IsMuted());
 }
 
 void DialogManager::AttachHandlers()
@@ -90,7 +129,7 @@ void DialogManager::AttachHandlers()
     _dialogServiceConnector->Recognizing += [&](const SpeechRecognitionEventArgs& event)
     {
         printf("INTERMEDIATE: %s ...\n", event.Result->Text.c_str());
-        DeviceStatusIndicators::SetStatus(DeviceStatus::Detecting);
+        SetDeviceStatus(DeviceStatus::Detecting);
     };
 
     // Signal for events containing speech recognition results.
@@ -115,7 +154,7 @@ void DialogManager::AttachHandlers()
         }
 
         //update the device status
-        DeviceStatusIndicators::SetStatus(newStatus);
+        SetDeviceStatus(newStatus);
     };
 
     // Signal for events relating to the cancellation of an interaction. The event indicates if the reason is a direct cancellation or an error.
@@ -123,12 +162,12 @@ void DialogManager::AttachHandlers()
     {
 
         printf("CANCELED: Reason=%d\n", (int)event.Reason);
-        DeviceStatusIndicators::SetStatus(DeviceStatus::Idle);
+        SetDeviceStatus(DeviceStatus::Idle);
         if (event.Reason == CancellationReason::Error)
         {
             printf("CANCELED: ErrorDetails=%s\n", event.ErrorDetails.c_str());
             printf("CANCELED: Did you update the subscription info?\n");
-            StartKws();
+            ResumeKws();
         }
     };
 
@@ -152,7 +191,7 @@ void DialogManager::AttachHandlers()
         {
             log_t("Activity has audio, playing asynchronously.");
 
-            if(!_bargeInSupported)
+            if (!_bargeInSupported)
             {
                 log_t("Pausing KWS during TTS playback");
                 PauseKws();
@@ -160,43 +199,44 @@ void DialogManager::AttachHandlers()
 
             auto audio = event.GetAudio();
             int play_result = 0;
-    
+
             uint32_t total_bytes_read = 0;
-            if(_volumeOn && _player != nullptr)
+            if (_volumeOn && _player != nullptr)
             {
-                
+
                 // If we are expecting more input and have audio to play, we will want to wait till all audio is done playing before
                 // before listening again. We can read from the stream here to accomplish this.
-                 if(continue_multiturn)
-                 {
+                if (continue_multiturn)
+                {
                     uint32_t playBufferSize = 1024;
                     unsigned int bytesRead = 0;
-                    std::unique_ptr<unsigned char []> playBuffer = std::make_unique<unsigned char[]>(playBufferSize);
-                    do{
+                    std::unique_ptr<unsigned char[]> playBuffer = std::make_unique<unsigned char[]>(playBufferSize);
+                    do
+                    {
                         bytesRead = audio->Read(playBuffer.get(), playBufferSize);
                         _player->Play(playBuffer.get(), bytesRead);
                         total_bytes_read += bytesRead;
-                    }while(bytesRead > 0);
-                    
-                    DeviceStatusIndicators::SetStatus(DeviceStatus::Speaking);
-                    
+                    } while (bytesRead > 0);
+
+                    SetDeviceStatus(DeviceStatus::Speaking);
+
                     // We don't want to timeout while tts is playing so start 1 second before it is done
                     int secondsOfAudio = total_bytes_read / 32000;
-                    std::this_thread::sleep_for(std::chrono::milliseconds((secondsOfAudio-1)*1000));
+                    std::this_thread::sleep_for(std::chrono::milliseconds((secondsOfAudio - 1) * 1000));
                 }
                 else
                 {
-                    play_result = _player->Play(audio);
+                    std::shared_ptr<IAudioPlayerStream> playerStream = std::make_shared<AudioPlayerStreamImpl>(audio);
+                    play_result = _player->Play(playerStream);
                 }
             }
 
             if (!continue_multiturn)
             {
-                DeviceStatusIndicators::SetStatus(DeviceStatus::Idle);
+                SetDeviceStatus(DeviceStatus::Idle);
             }
-            
         }
-        
+
         if (continue_multiturn)
         {
             log_t("Activity requested a continuation (ExpectingInput) -- listening again");
@@ -205,62 +245,79 @@ void DialogManager::AttachHandlers()
         }
         else
         {
-            if(!_bargeInSupported)
+            if (!_bargeInSupported)
             {
-                StartKws();
+                ResumeKws();
             }
         }
     };
-}
-
-void DialogManager::PauseKws()
-{
-    log_t("Enter PauseKws (state = ", uint32_t(_keywordActivationState), ")");
-
-    if (_keywordActivationState == KeywordActivationState::Listening)
-    {
-        log_t("Stopping keyword recognition");
-        auto future = _dialogServiceConnector->StopKeywordRecognitionAsync();
-        _keywordActivationState = KeywordActivationState::Paused;
-    }
-
-    log_t("Exit PauseKws (state = ", uint32_t(_keywordActivationState), ")");
 }
 
 void DialogManager::StartKws()
 {
     log_t("Enter StartKws (state = ", uint32_t(_keywordActivationState), ")");
 
-    if (_keywordActivationState == KeywordActivationState::Paused)
-    {
-        auto modelPath = _agentConfig->KeywordRecognitionModel();
-        log_t("Initializing keyword recognition with: ", modelPath);
-        auto model = KeywordRecognitionModel::FromFile(modelPath);
-        auto _ = _dialogServiceConnector->StartKeywordRecognitionAsync(model);
-        _keywordActivationState = KeywordActivationState::Listening;
-        log_t("KWS initialized");
-    }
+    auto modelPath = _agentConfig->KeywordRecognitionModel();
+    log_t("Initializing keyword recognition with: ", modelPath);
+    auto model = KeywordRecognitionModel::FromFile(modelPath);
+    auto _ = _dialogServiceConnector->StartKeywordRecognitionAsync(model);
+    _keywordActivationState = KeywordActivationState::Listening;
+    log_t("KWS initialized");
 
     log_t("Exit StartKws (state = ", uint32_t(_keywordActivationState), ")");
 }
 
+void DialogManager::ResumeKws()
+{
+    if (_keywordActivationState == KeywordActivationState::Paused)
+    {
+        StartKws();
+    }
+}
+
 void DialogManager::StartListening()
 {
-    log_t("Now listening...");
-    if(_bargeInSupported)
-    {
-        _player->Stop();
-    }
-    DeviceStatusIndicators::SetStatus(DeviceStatus::Listening);
-    auto future = _dialogServiceConnector->ListenOnceAsync();
+    _player->Stop();
+
+    ContinueListening();
 }
 
 void DialogManager::ContinueListening()
 {
     log_t("Now listening...");
-    DeviceStatusIndicators::SetStatus(DeviceStatus::Listening);
+    SetDeviceStatus(DeviceStatus::Listening);
     auto future = _dialogServiceConnector->ListenOnceAsync();
 };
+
+void DialogManager::Stop()
+{
+    log_t("Now stopping...");
+
+    if (_player != nullptr)
+    {
+        _player->Stop();
+    }
+    auto future = _dialogServiceConnector->DisconnectAsync();
+    InitializeConnection();
+    if (_keywordActivationState != KeywordActivationState::NotSupported)
+    {
+        StartKws();
+    }
+    SetDeviceStatus(DeviceStatus::Ready);
+}
+
+void DialogManager::MuteUnMute()
+{
+    if (_muter->MuteUnmute() == 0)
+    {
+        string result = _muter->IsMuted() ? "muted." : "unmuted.";
+        log_t("Microphone is " + result);
+    }
+    else
+    {
+        log_t("Mute/UnMute microphone failed.");
+    }
+}
 
 void DialogManager::StopKws()
 {
@@ -279,6 +336,20 @@ void DialogManager::StopKws()
     }
 
     log_t("Exit StopKws (state = ", uint32_t(_keywordActivationState), ")");
+}
+
+void DialogManager::PauseKws()
+{
+    log_t("Enter PauseKws (state = ", uint32_t(_keywordActivationState), ")");
+
+    if (_keywordActivationState == KeywordActivationState::Listening)
+    {
+        log_t("Stopping keyword recognition");
+        auto future = _dialogServiceConnector->StopKeywordRecognitionAsync();
+        _keywordActivationState = KeywordActivationState::Paused;
+    }
+
+    log_t("Exit PauseKws (state = ", uint32_t(_keywordActivationState), ")");
 }
 
 fstream DialogManager::OpenFile(const string& audioFilePath)
@@ -363,7 +434,7 @@ void DialogManager::InitializeDialogServiceConnectorFromFile()
     shared_ptr<DialogServiceConfig> config = _agentConfig->CreateDialogServiceConfig();
     _pushStream = AudioInputStream::CreatePushStream();
     auto audioConfig = AudioConfig::FromStreamInput(_pushStream);
-        
+
     _dialogServiceConnector = DialogServiceConnector::FromConfig(config, audioConfig);
     log_t("Connector created");
 }

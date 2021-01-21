@@ -28,6 +28,7 @@ echo "Building Linux Arm32 sample ..."
 if g++ -Wno-psabi \
 src/common/Main.cpp \
 src/linux/LinuxAudioPlayer.cpp \
+src/linux/LinuxMicMuter.cpp \
 src/common/AudioPlayerEntry.cpp \
 src/common/AgentConfiguration.cpp \
 src/common/DeviceStatusIndicators.cpp \
@@ -35,7 +36,6 @@ src/common/DialogManager.cpp \
 -o ./out/sample.exe \
 -std=c++14 \
 -D LINUX \
--D MAS \
 -L./lib/arm32 \
 -I./include/cxx_api \
 -I./include/c_api \

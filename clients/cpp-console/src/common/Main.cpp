@@ -44,8 +44,6 @@ int main(int argc, char** argv)
         wavFilePath = argv[2];
     }
 
-    DeviceStatusIndicators::SetStatus(DeviceStatus::Initializing);
-
     log_t("Loading configuration from file: ", configFilePath);
 
     shared_ptr<AgentConfiguration> agentConfig = AgentConfiguration::LoadFromFile(configFilePath);
@@ -55,39 +53,28 @@ int main(int argc, char** argv)
         return (int)agentConfig->LoadResult();
     }
 
+    std::shared_ptr<DialogManager> dialogManager;
+    string keystroke = "";
+
     // Wavfile path to send to Speech Service
     if (wavFilePath != "")
     {
-        DialogManager dialogManager(agentConfig, wavFilePath);
-        dialogManager.ListenFromFile();
-        log_t("Initialized with audio file. Enter 'x' to exit.");
-        string keystroke = "";
-        cin >> keystroke;
-        HandleKeystrokeOptions(dialogManager, keystroke);
-    }
-    else 
-    {
-        DialogManager dialogManager(agentConfig);
-    
-        // Activate keyword listening on start up if keyword model file exists
-        if (agentConfig->KeywordRecognitionModel().length() > 0)
-        {
-            dialogManager.SetKeywordActivationState(KeywordActivationState::Paused);
-            dialogManager.StartKws();
-        }
-        else
-        {
-            dialogManager.SetKeywordActivationState(KeywordActivationState::NotSupported);
-        }
-    
-        DeviceStatusIndicators::SetStatus(DeviceStatus::Ready);
+        log_t("Initialized with audio WAV file. Enter 'x' to exit.");
 
-        DisplayKeystrokeOptions(dialogManager);
-        log_t("Initialized with audio file. Enter 'x' to exit.");
-        string keystroke = "";
-        cin >> keystroke;
-        HandleKeystrokeOptions(dialogManager, keystroke);
+        dialogManager = make_shared<DialogManager>(agentConfig, wavFilePath);
+        dialogManager->ListenFromFile();
     }
+    else
+    {
+        log_t("Initialized with live mic. Enter 'x' to exit.");
+
+        dialogManager = make_shared<DialogManager>(agentConfig);
+
+        DisplayKeystrokeOptions(*dialogManager);
+    }
+
+    cin >> keystroke;
+    HandleKeystrokeOptions(*dialogManager, keystroke);
 
     fprintf(stdout, "Closing down and freeing variables.\n");
 
@@ -98,12 +85,18 @@ void DisplayKeystrokeOptions(DialogManager& dialogManager)
 {
     fprintf(stdout, "Commands:\n");
     fprintf(stdout, "1 [listen once]\n");
+    fprintf(stdout, "2 [stop]\n");
+    fprintf(stdout, "3 [mute/unmute]\n");
     if (dialogManager.GetKeywordActivationState() != KeywordActivationState::NotSupported)
     {
-        fprintf(stdout, "2 [start keyword listening]\n");
-        fprintf(stdout, "3 [stop keyword listening]\n");
+        fprintf(stdout, "4 [start keyword listening]\n");
+        fprintf(stdout, "5 [stop keyword listening]\n");
     }
     fprintf(stdout, "x [exit]\n");
+    if (dialogManager.IsMuted())
+    {
+        std::cout << ansi::foreground_red << "(Microphone is muted)" << ansi::reset << std::endl;
+    }
 };
 
 void HandleKeystrokeOptions(DialogManager& dialogManager, string keystroke)
@@ -115,12 +108,19 @@ void HandleKeystrokeOptions(DialogManager& dialogManager, string keystroke)
         {
             dialogManager.StartListening();
         }
-        if (keystroke == "2" && dialogManager.GetKeywordActivationState() != KeywordActivationState::NotSupported)
+        if (keystroke == "2")
         {
-            dialogManager.SetKeywordActivationState(KeywordActivationState::Paused);
+            dialogManager.Stop();
+        }
+        if (keystroke == "3")
+        {
+            dialogManager.MuteUnMute();
+        }
+        if (keystroke == "4" && dialogManager.GetKeywordActivationState() != KeywordActivationState::NotSupported)
+        {
             dialogManager.StartKws();
         }
-        if (keystroke == "3" && dialogManager.GetKeywordActivationState() != KeywordActivationState::NotSupported)
+        if (keystroke == "5" && dialogManager.GetKeywordActivationState() != KeywordActivationState::NotSupported)
         {
             dialogManager.StopKws();
         }

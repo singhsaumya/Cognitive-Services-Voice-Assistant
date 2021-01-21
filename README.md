@@ -44,7 +44,7 @@ This repository includes everything needed to build a sample [Voice Assistant](h
 </a>
 </p>
 <p>&nbsp;</p>
-Or browse individual components per the repository content below. You may also find the following 12-minute overview video useful:
+You may also find the following 12-minute overview video useful:
 
 <p align="center">
 <a href="https://www.youtube.com/watch?v=1zr0umHGFyc">
@@ -52,6 +52,9 @@ Or browse individual components per the repository content below. You may also f
 </a>
 </p>
 
+If you are writing a Bot-Framework bot, read the tutorial [Voice-enable your bot using the Speech SDK](https://docs.microsoft.com/azure/cognitive-services/speech-service/tutorial-voice-enable-your-bot-speech-sdk), and use sample clients in this repo to help you get started.
+
+Or just browse individual components per the repository content below.
 
 <!--
 The repo has sample clients in C++, C# and Java, samples of [Voice Assistant](https://docs.microsoft.com/en-us/azure/cognitive-services/speech-service/voice-assistants) clients for different platforms. It also includes a client tool for end-to-end regression testing of a Voice Assistant system.
@@ -70,14 +73,18 @@ Sample code for building Voice Assistant clients, using Microsoft's Speech SDK a
 | [clients\cpp-console](https://github.com/Azure-Samples/Cognitive-Services-Voice-Assistant/tree/master/clients/cpp-console) | Console client sample for Smart Speaker devices, configured via a json file to connect to your bot or Custom Commands application. It supports microphone input and audio playback. Build scripts for [Raspberry Pi](https://www.raspberrypi.org/), [GGEC Speaker](http://www.ggec.com/) and Windows are provided | C++, Windows, Linux |
 | [clients\java-android](https://github.com/Azure-Samples/Cognitive-Services-Voice-Assistant/tree/master/clients/java-android) | An Android application (phone or tablet) configured to connect to your bot or Custom Commands application | Java Android
 
-### Sample Custom Commands
+### Sample Custom Commands and Scripts
 
 | Folder | Description |
 |-------------|-------------|
-| [custom-commands](https://github.com/Azure-Samples/Cognitive-Services-Voice-Assistant/tree/master/custom-commands)| Landing page for Custom Command demos, including deployment instructions |
-| [custom-commands\hospitality](https://github.com/Azure-Samples/Cognitive-Services-Voice-Assistant/tree/master/custom-commands/hospitality)| Sample voice commands to control your room (lights, blinds, TV and temperature), including visualization of the results |
-| [custom-commands\inventory](https://github.com/Azure-Samples/Cognitive-Services-Voice-Assistant/tree/master/custom-commands/inventory) | Sample voice commands to control warehouse inventory (adding or removing different color crates), including visualization of the results |
-| [custom-commands\automotive](https://github.com/Azure-Samples/Cognitive-Services-Voice-Assistant/tree/master/custom-commands/automotive) | Sample voice commands to the environment in your car (temperature, .... ), including visualization of the results |
+| [custom-commands\demos](https://github.com/Azure-Samples/Cognitive-Services-Voice-Assistant/tree/master/custom-commands/demos)| Landing page for Custom Command demos, including deployment instructions |
+| [custom-commands\demos\hospitality](https://github.com/Azure-Samples/Cognitive-Services-Voice-Assistant/tree/master/custom-commands/demos/hospitality)| Sample voice commands to control your room (lights, blinds, TV and temperature), including visualization of the results in a hotel room settings |
+| [custom-commands\demos\inventory](https://github.com/Azure-Samples/Cognitive-Services-Voice-Assistant/tree/master/custom-commands/demos/inventory) | Sample voice commands to control warehouse inventory (adding or removing different color crates), including visualization of the results |
+| [custom-commands\demos\automotive](https://github.com/Azure-Samples/Cognitive-Services-Voice-Assistant/tree/master/custom-commands/demos/automotive) | Sample voice commands to the environment in your car (temperature, .... ), including visualization of the results |
+| [custom-commands\demos\careroom](https://github.com/Azure-Samples/Cognitive-Services-Voice-Assistant/tree/master/custom-commands/demos/careroom)| Sample voice commands to control your room (lights, blinds, TV and temperature), including visualization of the results in a hospital room or other healthcare facility |
+| [custom-commands\quick-start](https://github.com/Azure-Samples/Cognitive-Services-Voice-Assistant/tree/master/custom-commands/quick-start) | JSON Custom Command file for the [official quick-start guide](https://docs.microsoft.com/en-us/azure/cognitive-services/speech-service/custom-commands)  |
+| [custom-commands\scripts](https://github.com/Azure-Samples/Cognitive-Services-Voice-Assistant/tree/master/custom-commands/scripts) | Continuous deployment scripts for Azure DevOps pipeline |
+
 
 ### Sample Keyword Models
 
@@ -90,6 +97,13 @@ Sample code for building Voice Assistant clients, using Microsoft's Speech SDK a
 | Folder | Description | Language/Platform |
 |-------------|-------------|-------------------|
 | [clients\csharp-dotnet-core\voice-assistant-test](https://github.com/Azure-Samples/Cognitive-Services-Voice-Assistant/tree/master/clients/csharp-dotnet-core/voice-assistant-test) | Automated, multi-turn, end-to-end regression test for your bot or Custom Commands application. Supports WAV file input, text or Bot-Framework activities | C# .NET Core  |
+
+### Articles
+
+| File | Description |
+|-------------|-------------|
+| [docs\CloudConnectionLogic.md](docs/CloudConnectionLogic.md)| Discusses options for when to connect to Direct Line Speech channel and how long to keep the connection open  |
+| [docs\LocalBot.md](docs/LocalBot.md)| Running & debugging your Bot locally while using Direct Line Speech Channel |
 
 ### Root Folder Files
 
@@ -127,6 +141,12 @@ To build any of the sample client applications or deploy custom commands to your
     git clone https://github.com/Azure-Samples/Cognitive-Services-Voice-Assistant.git
     cd Cognitive-Services-Voice-Assistant
 ```
+
+## Related Microsoft GitHub Repos
+* https://github.com/Azure-Samples/cognitive-services-speech-sdk
+* https://github.com/Azure-Samples/Cognitive-Services-Speech-Devices-SDK
+* https://github.com/microsoft/botframework-solutions
+* https://github.com/Microsoft/BotBuilder-Samples
 
 ## Contributing
 

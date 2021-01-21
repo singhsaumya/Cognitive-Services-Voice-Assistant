@@ -5,14 +5,17 @@
 #include "DeviceStatusIndicators.h"
 #include "speechapi_cxx.h"
 #include <fstream>
+#include "AudioPlayerStreamImpl.h"
 
 #ifdef LINUX
 #include "LinuxAudioPlayer.h"
+#include "LinuxMicMuter.h"
 #endif
 
 #ifdef WINDOWS
 #include <Windows.h>
 #include "WindowsAudioPlayer.h"
+#include "WindowsMicMuter.h"
 #endif
 
 using namespace std;
@@ -42,29 +45,45 @@ class DialogManager
 public:
     DialogManager(shared_ptr<AgentConfiguration> agentConfig);
     DialogManager(shared_ptr<AgentConfiguration> agentConfig, string audioFilePath);
+    const DeviceStatus GetDeviceStatus() { return _deviceStatus; };
     const KeywordActivationState GetKeywordActivationState() { return _keywordActivationState; }
-    void SetKeywordActivationState(const KeywordActivationState& state) { _keywordActivationState = state; }
-    void PauseKws();
-    void StartKws();
+    // Start a listening session that will terminate after the first utterance.
     void StartListening();
-    void ContinueListening();
+    // Stop audio player, re-initialize back end connection, and restart Keyword spotting if it is supported.
+    void Stop();
+    // Mute and unmute default microphone.
+    void MuteUnMute();
+    // Initiate keyword recognition.
+    void StartKws();
+    // Stop keyword recognition.
     void StopKws();
+    // Start a listening session that read audio stream from a wav file.
     void ListenFromFile();
+    // Get mute state of the default microphone.
+    bool IsMuted() { return _muter ? _muter->IsMuted() : false; };
 
 private:
     bool _volumeOn = false;
     bool _bargeInSupported = false;
     string _audioFilePath = "";
+    DeviceStatus _deviceStatus = DeviceStatus::Initializing;
     KeywordActivationState _keywordActivationState = KeywordActivationState::Undefined;
     IAudioPlayer* _player;
+    shared_ptr <IMicMuter> _muter;
     shared_ptr<AgentConfiguration> _agentConfig;
     shared_ptr<DialogServiceConnector> _dialogServiceConnector;
     shared_ptr<PushAudioInputStream> _pushStream;
     void InitializeDialogServiceConnectorFromMicrophone();
     void InitializeDialogServiceConnectorFromFile();
     void InitializePlayer();
+    void InitializeMuter();
     void AttachHandlers();
     void InitializeConnection();
+    void SetDeviceStatus(const DeviceStatus status);
+    void SetKeywordActivationState(const KeywordActivationState& state) { _keywordActivationState = state; }
+    void ContinueListening();
+    void ResumeKws();
+    void PauseKws();
     fstream OpenFile(const string& audioFilePath);
     int ReadBuffer(fstream& fs, uint8_t* dataBuffer, uint32_t size);
     void PushData(const string& audioFilePath);

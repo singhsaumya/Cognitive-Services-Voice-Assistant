@@ -1,0 +1,227 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+    <meta name="description" content="">
+    <meta name="author" content="">
+
+    <title>Virtual Car</title>
+
+    <link rel="stylesheet" href="https://ajax.aspnetcdn.com/ajax/bootstrap/4.3.1/css/bootstrap.css"
+        crossorigin="anonymous">
+
+    <style>
+        body {
+            background-color: #f4f5f6;
+        }
+
+        #automotive-room {
+            display: none;
+        }
+
+        .demo-frame {
+            position: relative;
+            margin-left: auto;
+            margin-right: auto;
+            width: 100%;
+            height: 100%;
+            max-width: 1440px;
+            max-height: 810px;
+            min-width: 960px;
+            min-height: 540px;
+        }
+
+        .automotive-image {
+            position: relative;
+            width: 100%;
+            max-width: 1440px;
+            min-width: 960px;
+        }
+
+        .overlays {
+            position: absolute;
+            top: 0;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 100;
+        }
+
+        .thermostat {
+            position: absolute;
+            font-size: 60px;
+            font-weight: bolder;
+            color: azure;
+            top: 35%;
+            left: 62%;
+            z-index: 100;
+        }
+
+        #top-hint {
+            position: absolute;
+            font-size: 22px;
+            color: white;
+            top: 14%;
+            left: 17.5%;
+            z-index: 100;
+            width: 265px;
+            font-family: Segoe UI, Frutiger, Frutiger Linotype, Dejavu Sans, Helvetica Neue, Arial, sans-serif;
+        }
+
+        #middle-hint {
+            position: absolute;
+            font-size: 22px;
+            color: white;
+            top: 50.5%;
+            left: 62.5%;
+            z-index: 100;
+            width: 265px;
+            font-family: Segoe UI, Frutiger, Frutiger Linotype, Dejavu Sans, Helvetica Neue, Arial, sans-serif;
+        }
+
+        #bottom-hint {
+            position: absolute;
+            font-size: 22px;
+            color: white;
+            top: 69%;
+            left: 22%;
+            z-index: 100;
+            width: 436px;
+
+            font-family: Segoe UI, Frutiger, Frutiger Linotype, Dejavu Sans, Helvetica Neue, Arial, sans-serif;
+        }
+
+        .try-saying {
+            font-size: 22px;
+            font-weight: bold;
+            margin-bottom: -20px;
+        }
+
+        .message {
+            font-size: 20px;
+            font-weight: normal;
+        }
+
+        .restart-message {
+            font-size: 20px;
+            font-weight: normal;
+        }
+    </style>
+</head>
+
+<body>
+
+    <main role="main">
+        <div id="automotive-room" class="demo-frame">
+            <img id="0" src="./Background.png" class="automotive-image" style="position:relative" alt="">
+            <img id="screen" src="./automotive-screen-off.png" class="automotive-image overlays" style="position:absolute" alt="">
+            <img id="screen-on" src="./automotive-screen-on.png" class="automotive-image overlays" style="position:absolute" alt="">
+            <img id="defrost" src="./automotive-defrost-on.png" class="automotive-image overlays" style="position:absolute" alt="">
+            <img id="heater-" src="./automotive-heater-on.png" class="automotive-image overlays" style="position:absolute" alt="">
+            <img id="seatwarmer" src="./automotive-seatwarmer-on.png" class="automotive-image overlays" style="position:absolute;" alt="">
+            <div id="thermostat" class="thermostat"><span id="temperature">65°</span></div>
+
+            <div id="help-content">
+                <img id="helpboxes" src="./automotive-bluebox.png" class="automotive-image overlays" style="position:absolute;" alt="">
+
+                <div id="top-hint">
+                    <div class="try-saying">Try saying:</div>
+                    <br>
+                    <div class="message">"Turn on defroster"</div>
+                </div>
+                <div id="middle-hint">
+                    <div class="try-saying">Try saying:</div>
+                    <br>
+                    <div class="message">"Set to 72 degrees"</div>
+                </div>
+                <div id="bottom-hint">
+                    <div class="try-saying">Try saying:</div>
+                    <br>
+                    <div class="message">"Turn on the seat heater"</div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- Bootstrap core JavaScript
+    ================================================== -->
+    <!-- Placed at the end of the document so the pages load faster -->
+    <script src="https://ajax.aspnetcdn.com/ajax/jQuery/jquery-3.2.1.min.js" crossorigin="anonymous"></script>
+    <script src="https://ajax.aspnetcdn.com/ajax/bootstrap/4.3.1/bootstrap.min.js" crossorigin="anonymous"></script>
+
+    <script>
+        $(function () {
+            var urlParams = new URLSearchParams(window.location.search);
+            var jsonUrl = "https://automotivedemowidget.azurewebsites.net/api/AutomotiveDemo?room=" + urlParams.get("room");
+            $.getJSON("ConnectionURLS.json", function (data) {
+                jsonUrl = data.AZURE_FUNCTION_URL;
+                if (urlParams.has("room")) {
+                    var room = urlParams.get("room");
+                    jsonUrl = jsonUrl + "?room=" + room;
+                }
+                else {
+                    var roomNumber = parseInt((Math.random() * 500000), 10)
+                    jsonUrl = jsonUrl + "?room=" + roomNumber;
+                }
+
+                var timesRun = 1;
+                $.getJSON(jsonUrl, function (configuration) {
+                    apply(configuration);
+                    $("#automotive-room").css("display", "inherit");
+                    setInterval(function () {
+                        timesRun += 1;
+                        if (timesRun < 10800) {
+                            $.getJSON(jsonUrl, function (configuration) {
+                                apply(configuration);
+                            });
+                        }
+                    }, 1000);
+                });
+
+                setTimeout(function () {
+                    $("#restartModal").modal();
+                }, 10800000);
+
+                function apply(configuration) {
+                    $("#temperature").html(configuration.Temperature + "°");
+
+                    if (configuration.Help) {
+                        $("#help-content").fadeIn('fast')
+                    } else {
+                        $("#help-content").fadeOut('fast')
+                    }
+
+                    if (configuration.SeatWarmers) {
+                        $("#seatwarmer").fadeIn('fast')
+                    } else {
+                        $("#seatwarmer").fadeOut('fast')
+                    }
+
+                    if (configuration.Defrost) {
+                        $("#defrost").fadeIn('fast')
+                    } else {
+                        $("#defrost").fadeOut('fast')
+                    }
+                }
+            });
+        });
+    </script>
+    <div class="modal fade" id="restartModal" tabindex="-1" role="dialog" aria-labelledby="restartModalLabel"
+        aria-hidden="true">
+        <div class="modal-dialog" role="document">
+            <div class="modal-content">
+                <div class="modal-body">
+                    <p style="text-align: center;">
+                        <span class="restart-message">Demo stopped</span>
+                    </p>
+                </div>
+            </div>
+        </div>
+    </div>
+</body>
+
+</html>

@@ -45,6 +45,7 @@ namespace VoiceAssistantTest
         private bool keyword;
         private KeywordRecognitionModel kwsTable;
         private int speechDuration = 0;
+        private AudioConfig audioConfig = AudioConfig.FromStreamInput(GlobalPullStream.FilePullStreamCallback);
 
         /// <summary>
         /// Gets or sets recognized text of the speech input.
@@ -108,6 +109,12 @@ namespace VoiceAssistantTest
                 // from the service and connection will close. Remove line below when supported.
                 config.SetProperty("KeywordConfig_EnableKeywordVerification", "false");
             }
+            else
+            {
+                // If a custom speech endpoint is not specified, keyword verification is set
+                // according to the default or configured settings.
+                config.SetProperty("KeywordConfig_EnableKeywordVerification", this.appsettings.KeywordVerificationEnabled.ToString().ToLower());
+            }
 
             if (!string.IsNullOrWhiteSpace(this.appsettings.CustomVoiceDeploymentIds))
             {
@@ -161,9 +168,18 @@ namespace VoiceAssistantTest
                 this.connector = null;
             }
 
-            this.pushAudioInputStream = AudioInputStream.CreatePushStream();
-            this.connector = new DialogServiceConnector(config, AudioConfig.FromStreamInput(this.pushAudioInputStream));
+            if (this.appsettings.PushStreamEnabled)
+            {
+                this.pushAudioInputStream = AudioInputStream.CreatePushStream();
+                this.audioConfig = AudioConfig.FromStreamInput(this.pushAudioInputStream);
+            }
+            else
+            {
+                config.SetProperty("KeywordConfig_EnableKeywordVerification", "false");
+                this.audioConfig = AudioConfig.FromStreamInput(GlobalPullStream.FilePullStreamCallback);
+            }
 
+            this.connector = new DialogServiceConnector(config, this.audioConfig);
             if (this.appsettings.BotGreeting)
             {
                 // Starting the timer to calculate latency for Bot Greeting.
@@ -237,26 +253,38 @@ namespace VoiceAssistantTest
         /// <param name="wavFile">WAV File in each turn.</param>
         public void ReadAudio(string wavFile)
         {
-            int readBytes;
-
             lock (this.BotReplyList)
             {
                 this.BotReplyList.Clear();
                 this.indexActivityWithAudio = 0;
             }
 
-            byte[] dataBuffer = new byte[MaxSizeOfTtsAudioInBytes];
-            WaveFileReader waveFileReader = new WaveFileReader(Path.Combine(this.appsettings.InputFolder, wavFile));
-
-            // Reading header bytes
-            int headerBytes = waveFileReader.Read(dataBuffer, 0, WavHeaderSizeInBytes);
-
-            while ((readBytes = waveFileReader.Read(dataBuffer, 0, BytesToRead)) > 0)
+            if (this.appsettings.PushStreamEnabled)
             {
-                this.pushAudioInputStream.Write(dataBuffer, readBytes);
-            }
+                int readBytes;
 
-            waveFileReader.Dispose();
+                byte[] dataBuffer = new byte[MaxSizeOfTtsAudioInBytes];
+                WaveFileReader waveFileReader = new WaveFileReader(Path.Combine(this.appsettings.InputFolder, wavFile));
+
+                // Reading header bytes
+                int headerBytes = waveFileReader.Read(dataBuffer, 0, WavHeaderSizeInBytes);
+
+                while ((readBytes = waveFileReader.Read(dataBuffer, 0, BytesToRead)) > 0)
+                {
+                    this.pushAudioInputStream.Write(dataBuffer, readBytes);
+                }
+
+                // When done, we forcibly write one second (32000 bytes) of silence
+                // to the stream, forcing the speech recognition service to segment.
+                Array.Clear(dataBuffer, 0, 32000);
+                this.pushAudioInputStream.Write(dataBuffer, 32000);
+
+                waveFileReader.Dispose();
+            }
+            else
+            {
+                GlobalPullStream.FilePullStreamCallback.ReadFile(Path.Combine(this.appsettings.InputFolder, wavFile));
+            }
         }
 
         /// <summary>
@@ -269,7 +297,7 @@ namespace VoiceAssistantTest
 
             if (!this.keyword)
             {
-                Trace.TraceInformation($"[{DateTime.Now.ToString("h:mm:ss tt", CultureInfo.CurrentCulture)}] Start listening");
+                Trace.TraceInformation($"[{DateTime.Now.ToString("hh:mm:ss.fff", CultureInfo.CurrentCulture)}] Start listening");
 
                 // Don't wait for this task to finish. It may take a while, even after the "Recognized" event is received. This is a known
                 // issue in Speech SDK and should be fixed in a future versions.
@@ -294,7 +322,7 @@ namespace VoiceAssistantTest
             }
 
             string result = await this.connector.SendActivityAsync(activity).ConfigureAwait(false);
-            Trace.TraceInformation($"[{DateTime.Now.ToString("h:mm:ss tt", CultureInfo.CurrentCulture)}] Activity sent to channel. InteractionID {result}");
+            Trace.TraceInformation($"[{DateTime.Now.ToString("hh:mm:ss.fff", CultureInfo.CurrentCulture)}] Activity sent to channel. InteractionID {result}");
             return this;
         }
 
@@ -353,12 +381,12 @@ namespace VoiceAssistantTest
             }
             else if (!bootstrapMode)
             {
-                Trace.TraceInformation($"[{DateTime.Now.ToString("h:mm:ss tt", CultureInfo.CurrentCulture)}] Timed out waiting for expected replies. Received {filteredactivities} activities (configured to wait for {this.responseCount}):");
+                Trace.TraceInformation($"[{DateTime.Now.ToString("hh:mm:ss.fff", CultureInfo.CurrentCulture)}] Timed out waiting for expected replies. Received {filteredactivities} activities (configured to wait for {this.responseCount}):");
                 source.Cancel();
             }
             else
             {
-                Trace.TraceInformation($"[{DateTime.Now.ToString("h:mm:ss tt", CultureInfo.CurrentCulture)}] Received {filteredactivities} activities.");
+                Trace.TraceInformation($"[{DateTime.Now.ToString("hh:mm:ss.fff", CultureInfo.CurrentCulture)}] Received {filteredactivities} activities.");
                 source.Cancel();
             }
 
@@ -391,7 +419,11 @@ namespace VoiceAssistantTest
         {
             this.kwsTable?.Dispose();
             this.connector.Dispose();
-            this.pushAudioInputStream.Dispose();
+            this.audioConfig.Dispose();
+            if (this.appsettings.PushStreamEnabled)
+            {
+                this.pushAudioInputStream.Dispose();
+            }
         }
 
         /// <summary>
@@ -631,7 +663,7 @@ namespace VoiceAssistantTest
         private int WriteAudioToWAVfile(PullAudioOutputStream audio, string baseFileName, string dialogID, int turnID, int indexActivityWithAudio)
         {
             FileStream fs = null;
-            string testFileOutputFolder = Path.Combine(this.appsettings.OutputFolder, baseFileName + "Output");
+            string testFileOutputFolder = Path.Combine(this.appsettings.OutputFolder, baseFileName);
             string wAVFolderPath = Path.Combine(testFileOutputFolder, ProgramConstants.WAVFileFolderName);
             int durationInMS = 0;
 

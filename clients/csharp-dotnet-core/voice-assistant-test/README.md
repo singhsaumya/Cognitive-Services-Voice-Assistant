@@ -105,6 +105,12 @@ Here is the full list:
 
 <font color="red">TODO: Make the above relative path to InputFolder?</font>
 
+>#### KeywordVerificationEnabled
+>`bool | optional | false | true`. A boolean which indicates if your bot or custom command application is configured to use keyword verification. The default value is `true`. Note that if a [CustomSREndpointId](#customsrendpointid) is specified, this value is ignored and keyword verification is automatically disabled.
+
+>#### PushStreamEnabled
+>`bool | optional | false | true`. A boolean which indicates if the test should use a "push" stream to interact with the Speech SDK. The default value is `false`. This can be useful in making sure the tests mimic your application.
+
 >#### AriaProjectKey
 >`sring | optional | null | "0123456789abcdef0123456789abcdef-01234567-890a-bcde-f012-34567890abcd-ef01"`. An optional Aria project key. If given, dialog success and failure events will be sent to the Aria cloud. For more information on Aria, see [https://www.aria.ms/](https://www.aria.ms/).
 
@@ -134,6 +140,9 @@ Here is the full list:
 >>
 >>#### Skip
 >>`bool | optional | false | true`. If true, the test file will be skipped while executing tests. This is useful when the application configuration file specifies multiple test files, but you only want to run one (or a few) of them. Use Skip to temporary disable tests.
+>>
+>>#### WavAndUtterancePairs
+>>`bool | optional | false | true`. "If true, and a dialog has both [WavFile](#wavfile) and [Utternace](#utterance) fields populated, the dialog will be [run twice](#Running-tests-twice-once-with-text-input-and-once-with-audio), first with wav input, and then with text input. If false, a dialog will only be run once, either with wav input or text input.
 
 ### Test configuration file
 
@@ -306,6 +315,9 @@ In summary, to accurately measure UPL do these three things:
 
 Note: This has not been tested when keyword activation is used. At this time we do not recommend measuring UPL using the above method when [Keyword](#Keyword) is set to true.
 
+### Running tests twice once with text input and once with audio
+
+The [WavAndUtterancePairs](#WavAndUtterancePairs) flag, if set to true will run the same test twice once with audio and again with text. A turn with audio input may fail due to incorrect speech recognition result but may pass with text input indicating an audio or SR issue. The test tool's UtteranceMatch compares the SR result with the Utterance. In order to run the test twice, the WavFile and Utterance must be present for the respective turn. Some reasons why a WavFile could return incorrect SR could be because there is not ending silence for proper segmentation, WavFile audio is not long enough, or incorrect format. We recommend setting this flag to true that an audio input to make sure the test is also run with text input.
 
 ### Running tests in an Azure DevOps pipeline
 
