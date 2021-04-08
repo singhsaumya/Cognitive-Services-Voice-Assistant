@@ -1,0 +1,19 @@
+[
+  {
+    "DialogID": "0",
+    "Description": "Testing 'turn it'",
+    "Turns": [
+      {
+        "TurnID": 0,
+        "Utterance": "turn it",
+        "ExpectedResponses": [
+          {
+            "type": "message",
+            "text": "Sorry. I didn't quite catch that || I'm not sure what you meant by that",
+          }
+        ],
+        "ExpectedUserPerceivedLatency": 1500
+      }
+    ]
+  }
+]
